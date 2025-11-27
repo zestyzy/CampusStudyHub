@@ -1,0 +1,9 @@
+{
+  "base_directory": "~/CampusStudyMaterials",
+  "courses": [
+    "Computer Science",
+    "Mathematics",
+    "Physics"
+  ],
+  "upcoming_window_days": 7
+}
