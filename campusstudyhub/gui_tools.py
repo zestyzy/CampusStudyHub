@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List, Optional
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
@@ -40,7 +40,11 @@ class GPAFrame(ctk.CTkFrame):
         for col, text in enumerate(headers):
             ctk.CTkLabel(self.table, text=text).grid(row=0, column=col, padx=4, pady=2)
 
-        self.summary = ctk.CTkLabel(self, text="总学分：0 | 平均分：0 | GPA：0 | 专业GPA：0", font=("PingFang SC", 14, "bold"))
+        self.summary = ctk.CTkLabel(
+            self,
+            text="总学分：0 | 平均分：0 | GPA：0 | 专业GPA：0",
+            font=("PingFang SC", 16, "bold"),
+        )
         self.summary.grid(row=3, column=0, pady=8)
 
     def _add_row(self, data: Dict[str, str] | None = None) -> None:
@@ -319,11 +323,7 @@ class FigureComposerFrame(ctk.CTkFrame):
             resized.append(img.resize((base_w, base_h), Image.Resampling.LANCZOS))
 
         title_text = self.title_entry.get().strip()
-        font_path = None
-        if self.font_family.get():
-            font_path = self._font_path(self.font_family.get())
-        style = "bold" if self.bold_var.get() else ""
-        font = ImageFont.truetype(font_path or "Arial", size=font_size) if font_path else ImageFont.load_default()
+        font = self._resolve_font(self.font_family.get(), font_size, self.bold_var.get(), self.italic_var.get())
 
         title_height = font_size + 10 if title_text else 0
         canvas_w = cols * base_w + (cols + 1) * pad
@@ -348,20 +348,33 @@ class FigureComposerFrame(ctk.CTkFrame):
             canvas.paste(resized[idx], (x, y))
             if self.sublabel_var.get():
                 label = f"({chr(97 + idx)})"
-                draw.text((x + 10, y + 10), label, font=font, fill="white", stroke_width=1, stroke_fill="black")
+                draw.text((x + 10, y + 10), label, font=font, fill="black", stroke_width=1, stroke_fill="white")
 
         save_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG", "*.png")])
         if save_path:
             canvas.save(save_path, dpi=(dpi, dpi))
             messagebox.showinfo("完成", "已输出高分辨率拼图")
 
-    def _font_path(self, name: str) -> str | None:
-        # 简化处理：macOS 常见字体路径
-        candidates = {
-            "Arial": "/Library/Fonts/Arial.ttf",
-            "Times New Roman": "/Library/Fonts/Times New Roman.ttf",
-            "Helvetica": "/System/Library/Fonts/Helvetica.ttc",
-            "PingFang SC": "/System/Library/Fonts/PingFang.ttc",
+    def _font_path(self, name: str, bold: bool, italic: bool) -> Optional[str]:
+        # 简化处理：macOS 常见字体路径，尽量匹配粗体/斜体
+        mapping = {
+            ("Arial", False, False): "/Library/Fonts/Arial.ttf",
+            ("Arial", True, False): "/Library/Fonts/Arial Bold.ttf",
+            ("Arial", False, True): "/Library/Fonts/Arial Italic.ttf",
+            ("Arial", True, True): "/Library/Fonts/Arial Bold Italic.ttf",
+            ("Times New Roman", False, False): "/Library/Fonts/Times New Roman.ttf",
+            ("Times New Roman", True, False): "/Library/Fonts/Times New Roman Bold.ttf",
+            ("Times New Roman", False, True): "/Library/Fonts/Times New Roman Italic.ttf",
+            ("Times New Roman", True, True): "/Library/Fonts/Times New Roman Bold Italic.ttf",
+            ("Helvetica", False, False): "/System/Library/Fonts/Helvetica.ttc",
+            ("PingFang SC", False, False): "/System/Library/Fonts/PingFang.ttc",
         }
-        return candidates.get(name)
+        return mapping.get((name, bold, italic)) or mapping.get((name, False, False))
+
+    def _resolve_font(self, family: str, size: int, bold: bool, italic: bool) -> ImageFont.FreeTypeFont:
+        path = self._font_path(family, bold, italic)
+        try:
+            return ImageFont.truetype(path or "Arial", size=size)
+        except Exception:
+            return ImageFont.load_default()
 

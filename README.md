@@ -1,20 +1,18 @@
 # CampusStudyHub
 
-CampusStudyHub is a lightweight, local CustomTkinter application that helps university students track course tasks, follow CCF-relevant conference deadlines, organize study materials, and view simple progress statistics. Everything is stored locally in JSON/CSV files so it can be inspected, extended, and used offline as a teaching example.
+CampusStudyHub is a lightweight, local CustomTkinter application that helps computer science students and researchers manage coursework, track CCF-relevant conference deadlines, monitor experiment logs, and generate research-ready assets. Everything is stored locally in JSON/CSV files so it can be inspected, extended, and used offline as a teaching example.
 
 ## Features
 
-- **Task management:** add/edit/delete tasks with course, type, due date, priority, and status. Filter by course/status and highlight overdue items.
-- **Reminders:** shows upcoming deadlines within a configurable window and lists overdue tasks.
-- **CCF conference tracker:** built-in list of common CCF-A conferences, customizable rows, filtering by category and upcoming window, and one-click LAN broadcast for approaching deadlines.
-- **File organization:** choose a base study directory, scan files, move them into `Course/Semester/Type/` folders, and export an index to CSV.
-- **Statistics:** simple counts per course and status plus a completion progress indicator.
-- **CustomTkinter dark UI tools:**
-  - 番茄钟（进度条、沉浸开关、番茄计数）
-  - LAN CCF 定向提醒 + 日志监控
-  - GPA 计算（必修/选修、专业 GPA）
-  - BibTeX 生成（会议/期刊模板）
-  - 科研拼图（可选 DPI、字体、子图标签）
+- **Task management & reminders:** add/edit/delete tasks with overdue highlighting and upcoming deadline views.
+- **File organization & stats:** scan/move study files into `Course/Semester/Type/` and export indexes; see course/status counts.
+- **学校事项（School）:** GPA 计算器（必修/选修区分，专业 GPA 和总体 GPA）。
+- **科研辅助（Research）:**
+  - 会议通知：管理同行列表、筛选/新增会议并定向 LAN 提醒。
+  - 实验监控：监听本地日志关键词，异常或完成时向选定同行发送 LAN 提示。
+  - BibTeX 生成：会议/期刊模板切换，动态字段校验。
+  - 科研拼图：统一分辨率、可选 DPI/字体/粗斜体、自动 (a)(b) 子图标签。
+- **其他（Others）:** 番茄钟（精确倒计时、进度条、沉浸静音模式、北京时间展示、可自定义时长）。
 
 ## Requirements
 
@@ -75,9 +73,9 @@ campusstudyhub/
 ├─ models.py            # Dataclasses for tasks, conferences, GPA rows, file index entries, research notes
 ├─ storage.py           # Load/save helpers for tasks, conferences, files, grades, research data
 ├─ lan.py               # UDP-based LAN notification helper
-├─ gui_main.py          # CustomTkinter window and tab wiring
-├─ gui_pomodoro.py      # CustomTkinter 番茄钟（进度条、沉浸模式）
-├─ gui_lan.py           # CCF LAN 定向提醒 + 日志监控
+├─ gui_main.py          # CustomTkinter window and tab wiring（学校事项/科研辅助/其他）
+├─ gui_pomodoro.py      # 番茄钟（进度条、沉浸静音、北京时间、自定义时长）
+├─ gui_lan.py           # CCF 会议通知 + 实验日志监控（分离功能）
 ├─ gui_tools.py         # GPA / BibTeX / 科研拼图（CustomTkinter）
 └─ 旧版 tkinter 界面    # gui_tasks.py、gui_files.py 等：保留作为示例，可逐步迁移到 CustomTkinter
 ```

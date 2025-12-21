@@ -1,11 +1,11 @@
-"""CustomTkinter 版主界面，整合科研辅助工具。"""
+"""CustomTkinter 深色主题主界面，分为学校事项、科研辅助与其他工具。"""
 from __future__ import annotations
 
 import customtkinter as ctk
 
+from .gui_lan import ConferenceLANFrame, ExperimentMonitorFrame, PeerManager
 from .gui_pomodoro import PomodoroFrame
-from .gui_lan import LANTrackerFrame
-from .gui_tools import GPAFrame, BibtexFrame, FigureComposerFrame
+from .gui_tools import BibtexFrame, FigureComposerFrame, GPAFrame
 
 
 def launch_app() -> None:
@@ -15,27 +15,37 @@ def launch_app() -> None:
 
     app = ctk.CTk()
     app.title("CampusStudyHub 研究助手")
-    app.geometry("1100x800")
+    app.geometry("1200x850")
 
     tabview = ctk.CTkTabview(app)
-    tabview.pack(fill="both", expand=True, padx=10, pady=10)
+    tabview.pack(fill="both", expand=True, padx=12, pady=12)
 
-    pomodoro_tab = tabview.add("番茄钟")
-    lan_tab = tabview.add("CCF 联网")
-    tools_tab = tabview.add("GPA / 拼图 / BibTeX")
+    school_tab = tabview.add("学校事项")
+    research_tab = tabview.add("科研辅助")
+    other_tab = tabview.add("其他")
 
-    PomodoroFrame(pomodoro_tab).pack(fill="both", expand=True, padx=10, pady=10)
-    LANTrackerFrame(lan_tab).pack(fill="both", expand=True, padx=10, pady=10)
+    # 学校事项：GPA 计算
+    school_inner = ctk.CTkTabview(school_tab)
+    school_inner.pack(fill="both", expand=True, padx=10, pady=10)
+    gpa_tab = school_inner.add("GPA 计算")
+    GPAFrame(gpa_tab).pack(fill="both", expand=True, padx=10, pady=10)
 
-    tools_inner = ctk.CTkTabview(tools_tab)
-    tools_inner.pack(fill="both", expand=True, padx=10, pady=10)
-    gpa_tab = tools_inner.add("GPA 计算")
-    fig_tab = tools_inner.add("科研拼图")
-    bib_tab = tools_inner.add("BibTeX")
+    # 科研辅助：会议通知、实验监控、BibTeX、科研拼图
+    research_inner = ctk.CTkTabview(research_tab)
+    research_inner.pack(fill="both", expand=True, padx=10, pady=10)
+    manager = PeerManager()
+    conf_tab = research_inner.add("会议通知")
+    exp_tab = research_inner.add("实验监控")
+    bib_tab = research_inner.add("BibTeX")
+    fig_tab = research_inner.add("科研拼图")
 
-    GPAFrame(gpa_tab).pack(fill="both", expand=True, padx=6, pady=6)
-    FigureComposerFrame(fig_tab).pack(fill="both", expand=True, padx=6, pady=6)
-    BibtexFrame(bib_tab).pack(fill="both", expand=True, padx=6, pady=6)
+    ConferenceLANFrame(conf_tab, manager).pack(fill="both", expand=True, padx=10, pady=10)
+    ExperimentMonitorFrame(exp_tab, manager).pack(fill="both", expand=True, padx=10, pady=10)
+    BibtexFrame(bib_tab).pack(fill="both", expand=True, padx=10, pady=10)
+    FigureComposerFrame(fig_tab).pack(fill="both", expand=True, padx=10, pady=10)
+
+    # 其他：番茄钟
+    PomodoroFrame(other_tab).pack(fill="both", expand=True, padx=10, pady=10)
 
     app.mainloop()
 
