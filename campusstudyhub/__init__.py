@@ -13,5 +13,8 @@ __all__ = [
     "gui_pomodoro",
     "gui_gpa",
     "gui_bibtex",
+    "gui_research",
+    "gui_lan",
+    "gui_tools",
     "lan",
 ]

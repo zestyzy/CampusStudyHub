@@ -1,97 +1,45 @@
-"""Tkinter main window for CampusStudyHub."""
+"""CustomTkinter 版主界面，整合科研辅助工具。"""
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk
-from typing import List
+import customtkinter as ctk
 
-from .config import AppConfig, load_config, save_config
-from .models import Task
-from .storage import load_tasks
-from .gui_tasks import TasksFrame
-from .gui_files import FilesFrame
-from .gui_stats import StatsFrame
-from .gui_conferences import ConferencesFrame
-from .gui_plot import FigureComposer
-from .gui_pomodoro import PomodoroTimer
-from .gui_gpa import GPACalculator
-from .gui_bibtex import BibtexGenerator
-
-
-class App(tk.Tk):
-    """Main application window."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.title("CampusStudyHub")
-        self.geometry("1000x700")
-
-        self.config_data: AppConfig = load_config()
-        self.tasks: List[Task] = load_tasks()
-
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        """Create tabs and widgets."""
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True)
-
-        self.tasks_frame = TasksFrame(
-            notebook,
-            tasks=self.tasks,
-            config=self.config_data,
-            on_tasks_updated=self._update_tasks,
-            on_config_update=self._update_config,
-        )
-        notebook.add(self.tasks_frame, text="Tasks")
-
-        self.files_frame = FilesFrame(
-            notebook,
-            config=self.config_data,
-            on_config_update=self._update_config,
-        )
-        notebook.add(self.files_frame, text="Files")
-
-        self.stats_frame = StatsFrame(notebook, tasks_provider=self._get_tasks)
-        notebook.add(self.stats_frame, text="Stats")
-
-        self.conf_frame = ConferencesFrame(
-            notebook,
-            config=self.config_data,
-            on_config_update=self._update_config,
-        )
-        notebook.add(self.conf_frame, text="CCF Conferences")
-
-        self.figure_frame = FigureComposer(notebook)
-        notebook.add(self.figure_frame, text="Figure Tool")
-
-        self.pomodoro_frame = PomodoroTimer(notebook)
-        notebook.add(self.pomodoro_frame, text="Pomodoro")
-
-        self.gpa_frame = GPACalculator(notebook)
-        notebook.add(self.gpa_frame, text="GPA Calc")
-
-        self.bib_frame = BibtexGenerator(notebook)
-        notebook.add(self.bib_frame, text="BibTeX")
-
-    def _update_tasks(self, tasks: List[Task]) -> None:
-        """Callback when tasks change."""
-        self.tasks = tasks
-        self.stats_frame.refresh()
-
-    def _update_config(self, config: AppConfig) -> None:
-        """Persist updated config and notify frames."""
-        self.config_data = config
-        save_config(config)
-        self.tasks_frame.refresh_config(config)
-        self.files_frame.refresh_config(config)
-        self.conf_frame.refresh_config(config)
-
-    def _get_tasks(self) -> List[Task]:
-        return self.tasks
+from .gui_pomodoro import PomodoroFrame
+from .gui_lan import LANTrackerFrame
+from .gui_tools import GPAFrame, BibtexFrame, FigureComposerFrame
 
 
 def launch_app() -> None:
-    """Launch the Tkinter application."""
-    app = App()
+    """启动 CustomTkinter 主窗口。"""
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("blue")
+
+    app = ctk.CTk()
+    app.title("CampusStudyHub 研究助手")
+    app.geometry("1100x800")
+
+    tabview = ctk.CTkTabview(app)
+    tabview.pack(fill="both", expand=True, padx=10, pady=10)
+
+    pomodoro_tab = tabview.add("番茄钟")
+    lan_tab = tabview.add("CCF 联网")
+    tools_tab = tabview.add("GPA / 拼图 / BibTeX")
+
+    PomodoroFrame(pomodoro_tab).pack(fill="both", expand=True, padx=10, pady=10)
+    LANTrackerFrame(lan_tab).pack(fill="both", expand=True, padx=10, pady=10)
+
+    tools_inner = ctk.CTkTabview(tools_tab)
+    tools_inner.pack(fill="both", expand=True, padx=10, pady=10)
+    gpa_tab = tools_inner.add("GPA 计算")
+    fig_tab = tools_inner.add("科研拼图")
+    bib_tab = tools_inner.add("BibTeX")
+
+    GPAFrame(gpa_tab).pack(fill="both", expand=True, padx=6, pady=6)
+    FigureComposerFrame(fig_tab).pack(fill="both", expand=True, padx=6, pady=6)
+    BibtexFrame(bib_tab).pack(fill="both", expand=True, padx=6, pady=6)
+
     app.mainloop()
+
+
+if __name__ == "__main__":
+    launch_app()
+

@@ -8,12 +8,22 @@ from pathlib import Path
 from typing import List, Optional
 
 from .config import DATA_DIR, ensure_data_dir
-from .models import ConferenceEvent, FileIndexEntry, GradeEntry, Task
+from .models import (
+    ConferenceEvent,
+    ExperimentEntry,
+    FileIndexEntry,
+    GradeEntry,
+    PaperEntry,
+    Task,
+)
 
 TASKS_PATH = DATA_DIR / "tasks.json"
 FILES_INDEX_PATH = DATA_DIR / "files_index.csv"
 CONFERENCES_PATH = DATA_DIR / "conferences.json"
 GRADES_PATH = DATA_DIR / "grades.json"
+EXPERIMENTS_PATH = DATA_DIR / "experiments.json"
+PAPERS_PATH = DATA_DIR / "papers.json"
+RESEARCH_MD_PATH = DATA_DIR / "research_summary.md"
 
 
 def load_tasks() -> List[Task]:
@@ -183,3 +193,69 @@ def save_grades(entries: List[GradeEntry]) -> None:
     serializable = [e.to_dict() for e in entries]
     with GRADES_PATH.open("w", encoding="utf-8") as f:
         json.dump(serializable, f, indent=2)
+
+
+def load_experiments() -> List[ExperimentEntry]:
+    """Load experiment tracker entries from disk."""
+
+    ensure_data_dir()
+    if not EXPERIMENTS_PATH.exists():
+        return []
+    try:
+        with EXPERIMENTS_PATH.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return [ExperimentEntry.from_dict(item) for item in raw]
+    except Exception:
+        return []
+
+
+def save_experiments(entries: List[ExperimentEntry]) -> None:
+    """Persist experiments to disk."""
+
+    ensure_data_dir()
+    serializable = [e.to_dict() for e in entries]
+    with EXPERIMENTS_PATH.open("w", encoding="utf-8") as f:
+        json.dump(serializable, f, indent=2)
+
+
+def load_papers() -> List[PaperEntry]:
+    """Load reading list papers from disk."""
+
+    ensure_data_dir()
+    if not PAPERS_PATH.exists():
+        return []
+    try:
+        with PAPERS_PATH.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return [PaperEntry.from_dict(item) for item in raw]
+    except Exception:
+        return []
+
+
+def save_papers(entries: List[PaperEntry]) -> None:
+    """Persist papers to disk."""
+
+    ensure_data_dir()
+    serializable = [e.to_dict() for e in entries]
+    with PAPERS_PATH.open("w", encoding="utf-8") as f:
+        json.dump(serializable, f, indent=2)
+
+
+def export_research_summary(experiments: List[ExperimentEntry], papers: List[PaperEntry]) -> None:
+    """Export a markdown summary for experiments and reading list."""
+
+    ensure_data_dir()
+    lines = ["# Research Summary", ""]
+    if experiments:
+        lines.append("## Experiments")
+        for exp in experiments:
+            lines.append(
+                f"- **{exp.title}** ({exp.project}) — {exp.status} | metric: {exp.metric or 'n/a'} | updated: {exp.updated_at or 'unknown'}"
+            )
+        lines.append("")
+    if papers:
+        lines.append("## Reading List")
+        for paper in papers:
+            doi_part = f" DOI: {paper.doi}" if paper.doi else ""
+            lines.append(f"- **{paper.title}** [{paper.status}] {doi_part}")
+    RESEARCH_MD_PATH.write_text("\n".join(lines), encoding="utf-8")

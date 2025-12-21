@@ -1,6 +1,6 @@
 # CampusStudyHub
 
-CampusStudyHub is a lightweight, local Tkinter application that helps university students track course tasks, follow CCF-relevant conference deadlines, organize study materials, and view simple progress statistics. Everything is stored locally in JSON/CSV files so it can be inspected, extended, and used offline as a teaching example.
+CampusStudyHub is a lightweight, local CustomTkinter application that helps university students track course tasks, follow CCF-relevant conference deadlines, organize study materials, and view simple progress statistics. Everything is stored locally in JSON/CSV files so it can be inspected, extended, and used offline as a teaching example.
 
 ## Features
 
@@ -9,21 +9,21 @@ CampusStudyHub is a lightweight, local Tkinter application that helps university
 - **CCF conference tracker:** built-in list of common CCF-A conferences, customizable rows, filtering by category and upcoming window, and one-click LAN broadcast for approaching deadlines.
 - **File organization:** choose a base study directory, scan files, move them into `Course/Semester/Type/` folders, and export an index to CSV.
 - **Statistics:** simple counts per course and status plus a completion progress indicator.
-- **Figure Tool:** stitch multiple PNG/JPGs into高分辨率论文配图（支持标题、子图标签、300DPI 输出）。
-- **Pomodoro:** 极简番茄钟，专注/休息循环并在到时提醒。
-- **GPA Calc:** 按学分加权计算平均分与 4.0 GPA，支持本地保存到 `data/grades.json`。
-- **BibTeX:** 输入论文标题或 DOI，生成并校验 BibTeX 条目，便于快速引用。
-- **Settings & LAN peers:** edit the list of courses, default base directory, upcoming window, and LAN notification peers; configuration is saved to `data/config.json`.
+- **CustomTkinter dark UI tools:**
+  - 番茄钟（进度条、沉浸开关、番茄计数）
+  - LAN CCF 定向提醒 + 日志监控
+  - GPA 计算（必修/选修、专业 GPA）
+  - BibTeX 生成（会议/期刊模板）
+  - 科研拼图（可选 DPI、字体、子图标签）
 
 ## Requirements
 
 - Python 3.9+
-- Tkinter (included with standard Python on macOS)
-- Pillow (for the figure stitching tool):
+- CustomTkinter + Pillow:
   ```bash
-  pip install pillow
+  pip install customtkinter pillow
   ```
-  Tkinter uses the system libraries and is included with the official macOS Python installer.
+  CustomTkinter 自带暗色主题；Tkinter 随官方 macOS Python 一起提供。
 
 ## 快速开始（中文）
 
@@ -33,11 +33,11 @@ CampusStudyHub is a lightweight, local Tkinter application that helps university
    python3 -m venv .venv
    source .venv/bin/activate
    ```
-3. 图像拼接工具需要 Pillow：
+3. CustomTkinter + Pillow：
    ```bash
-   pip install pillow
+   pip install customtkinter pillow
    ```
-   其余功能均使用标准库；请确保 macOS Python 带有 Tkinter。
+   其余功能均使用标准库；请确保 macOS Python 带有 Tkinter（官方安装包默认包含）。
 4. 运行：
    ```bash
    python main.py
@@ -54,12 +54,16 @@ CampusStudyHub is a lightweight, local Tkinter application that helps university
    python3 -m venv .venv
    source .venv/bin/activate
    ```
-3. **Install dependencies:** None required beyond the standard library. If using a minimal Python distribution, ensure Tkinter is installed (on macOS it ships with the official installer from python.org).
+3. **Install dependencies:**
+   ```bash
+   pip install customtkinter pillow
+   ```
+   Ensure Tkinter is available (it ships with the official macOS installer from python.org).
 4. **Run the app:**
    ```bash
    python main.py
    ```
-5. **Data files:** On first run, the app will create a `data/` directory with `config.json`, `tasks.json`, and `conferences.json`. File indexes are exported to `data/files_index.csv`; GPA 条目保存在 `data/grades.json`。
+5. **Data files:** On first run, the app will create a `data/` directory with `config.json`, `tasks.json`, and `conferences.json`. File indexes are exported to `data/files_index.csv`; GPA 条目保存在 `data/grades.json`；实验/阅读记录保存在 `data/experiments.json` 与 `data/papers.json`，可一键导出 `data/research_summary.md`。
 
 ## Project structure
 
@@ -68,18 +72,14 @@ main.py                 # Entry point
 campusstudyhub/
 ├─ __init__.py
 ├─ config.py            # Config defaults and persistence
-├─ models.py            # Dataclasses for tasks, conferences, GPA rows, file index entries
-├─ storage.py           # Load/save helpers for tasks, conferences, files, grades
+├─ models.py            # Dataclasses for tasks, conferences, GPA rows, file index entries, research notes
+├─ storage.py           # Load/save helpers for tasks, conferences, files, grades, research data
 ├─ lan.py               # UDP-based LAN notification helper
-├─ gui_main.py          # Application window and tab wiring
-├─ gui_tasks.py         # Task management UI and reminders
-├─ gui_files.py         # File scanning/organizing UI
-├─ gui_stats.py         # Statistics UI
-├─ gui_conferences.py   # CCF conference deadlines and LAN broadcasting
-├─ gui_plot.py          # Publication figure stitching with Pillow
-├─ gui_pomodoro.py      # Pomodoro timer
-├─ gui_gpa.py           # GPA calculator with persistence
-└─ gui_bibtex.py        # BibTeX generator/validator
+├─ gui_main.py          # CustomTkinter window and tab wiring
+├─ gui_pomodoro.py      # CustomTkinter 番茄钟（进度条、沉浸模式）
+├─ gui_lan.py           # CCF LAN 定向提醒 + 日志监控
+├─ gui_tools.py         # GPA / BibTeX / 科研拼图（CustomTkinter）
+└─ 旧版 tkinter 界面    # gui_tasks.py、gui_files.py 等：保留作为示例，可逐步迁移到 CustomTkinter
 ```
 
 ## Usage notes

@@ -126,3 +126,44 @@ class GradeEntry:
     @classmethod
     def from_dict(cls, raw: dict) -> "GradeEntry":
         return cls(**raw)
+
+
+@dataclass
+class ExperimentEntry:
+    """Tracks an experiment run for research projects."""
+
+    title: str
+    project: str
+    command: str = ""
+    status: str = "planned"
+    metric: str = ""
+    notes: str = ""
+    updated_at: str = ""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> "ExperimentEntry":
+        return cls(**raw)
+
+
+@dataclass
+class PaperEntry:
+    """Represents a paper in the personal reading queue."""
+
+    title: str
+    doi: str = ""
+    venue: str = ""
+    url: str = ""
+    status: str = "to_read"
+    notes: str = ""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> "PaperEntry":
+        return cls(**raw)
