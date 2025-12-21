@@ -4,6 +4,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from .gui_lan import ConferenceLANFrame, ExperimentMonitorFrame, PeerManager
+from .gui_monitor import ResourceMonitorFrame
 from .gui_pomodoro import PomodoroFrame
 from .gui_tools import BibtexFrame, FigureComposerFrame, GPAFrame
 
@@ -30,17 +31,19 @@ def launch_app() -> None:
     gpa_tab = school_inner.add("GPA 计算")
     GPAFrame(gpa_tab).pack(fill="both", expand=True, padx=10, pady=10)
 
-    # 科研辅助：会议通知、实验监控、BibTeX、科研拼图
+    # 科研辅助：会议通知、实验监控、资源监控、BibTeX、科研拼图
     research_inner = ctk.CTkTabview(research_tab)
     research_inner.pack(fill="both", expand=True, padx=10, pady=10)
     manager = PeerManager()
     conf_tab = research_inner.add("会议通知")
     exp_tab = research_inner.add("实验监控")
+    monitor_tab = research_inner.add("资源监控")
     bib_tab = research_inner.add("BibTeX")
     fig_tab = research_inner.add("科研拼图")
 
     ConferenceLANFrame(conf_tab, manager).pack(fill="both", expand=True, padx=10, pady=10)
     ExperimentMonitorFrame(exp_tab, manager).pack(fill="both", expand=True, padx=10, pady=10)
+    ResourceMonitorFrame(monitor_tab).pack(fill="both", expand=True, padx=10, pady=10)
     BibtexFrame(bib_tab).pack(fill="both", expand=True, padx=10, pady=10)
     FigureComposerFrame(fig_tab).pack(fill="both", expand=True, padx=10, pady=10)
 
