@@ -1,13 +1,15 @@
-"""包含 GPA 计算、BibTeX 生成、科研拼图三个工具（CustomTkinter 版）。"""
 from __future__ import annotations
 
 import json
+import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 from PIL import Image, ImageDraw, ImageFont
+
+from .storage import load_bib_cache, save_bib_cache
 
 DATA_DIR = Path("data")
 GRADES_FILE = DATA_DIR / "grades.json"
@@ -159,12 +161,13 @@ class GPAFrame(ctk.CTkFrame):
 
 
 class BibtexFrame(ctk.CTkFrame):
-    """可切换会议/期刊模板的 BibTeX 生成器。"""
+    """带 DOI 缓存与批量生成的 BibTeX 生成器。"""
 
     def __init__(self, master: ctk.CTkBaseClass) -> None:
         super().__init__(master)
-        self.mode = ctk.StringVar(value="conference")
+        self.mode = ctk.StringVar(value="会议")
         self.entries: Dict[str, ctk.CTkEntry] = {}
+        self.cache: dict = load_bib_cache()
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -174,13 +177,29 @@ class BibtexFrame(ctk.CTkFrame):
         toggle.set("会议")
         toggle.grid(row=1, column=0, pady=6)
 
+        doi_row = ctk.CTkFrame(self)
+        doi_row.grid(row=2, column=0, pady=4, padx=10, sticky="ew")
+        doi_row.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(doi_row, text="DOI (可选)").grid(row=0, column=0, padx=4)
+        self.doi_entry = ctk.CTkEntry(doi_row, placeholder_text="输入 DOI 后点击抓取")
+        self.doi_entry.grid(row=0, column=1, padx=4, sticky="ew")
+        ctk.CTkButton(doi_row, text="DOI 抓取", command=self._fetch_doi).grid(row=0, column=2, padx=4)
+
+        batch_row = ctk.CTkFrame(self)
+        batch_row.grid(row=3, column=0, pady=4, padx=10, sticky="ew")
+        batch_row.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(batch_row, text="批量 DOI/标题 (每行一个，可混合)").grid(row=0, column=0, sticky="w")
+        self.batch_box = ctk.CTkTextbox(batch_row, height=80)
+        self.batch_box.grid(row=1, column=0, sticky="ew", pady=4)
+        ctk.CTkButton(batch_row, text="批量生成", command=self._batch_generate).grid(row=2, column=0, pady=2)
+
         self.form = ctk.CTkFrame(self)
-        self.form.grid(row=2, column=0, padx=10, pady=6, sticky="ew")
+        self.form.grid(row=4, column=0, padx=10, pady=6, sticky="ew")
         self.form.grid_columnconfigure(1, weight=1)
 
         self.output = ctk.CTkTextbox(self, height=180)
-        self.output.grid(row=3, column=0, padx=10, pady=8, sticky="nsew")
-        ctk.CTkButton(self, text="生成", command=self._generate).grid(row=4, column=0, pady=6)
+        self.output.grid(row=5, column=0, padx=10, pady=8, sticky="nsew")
+        ctk.CTkButton(self, text="生成", command=self._generate).grid(row=6, column=0, pady=6)
 
         self._render_fields()
 
@@ -240,9 +259,125 @@ class BibtexFrame(ctk.CTkFrame):
         self.output.insert("end", body)
         self.output.configure(state="disabled")
 
+    def _fetch_doi(self) -> Dict[str, str]:
+        doi = self.doi_entry.get().strip()
+        if not doi:
+            messagebox.showinfo("提示", "请输入 DOI")
+            return {}
+        # 缓存命中
+        if doi in self.cache:
+            info = self.cache[doi]
+            self._fill_fields(info)
+            messagebox.showinfo("缓存", "已从缓存填充，可直接生成")
+            return info
+        url = f"https://api.crossref.org/works/{doi}"
+        try:
+            with urllib.request.urlopen(url, timeout=8) as resp:  # type: ignore[arg-type]
+                data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            info = data.get("message", {})
+            mapping = self._map_crossref(info, doi)
+            self.cache[doi] = mapping
+            save_bib_cache(self.cache)
+            self._fill_fields(mapping)
+            messagebox.showinfo("完成", "已填充 DOI 信息，可继续校对后生成")
+            return mapping
+        except Exception as exc:
+            messagebox.showinfo("提示", f"抓取失败：{exc}\n可手动填写字段继续生成")
+            return {}
+
+    def _fill_fields(self, mapping: Dict[str, str]) -> None:
+        self.mode.set("会议" if mapping.get("entry_type") == "inproceedings" else "期刊")
+        self._render_fields()
+        for field, value in mapping.items():
+            if field in self.entries:
+                self.entries[field].delete(0, "end")
+                self.entries[field].insert(0, str(value))
+
+    def _map_crossref(self, info: dict, doi: str) -> Dict[str, str]:
+        entry_type = info.get("type", "")
+        is_conf = "proceeding" in entry_type or "conference" in entry_type
+        authors = info.get("author", [])
+        author_str = " and ".join(
+            f"{a.get('family','')} {a.get('given','')}".strip() for a in authors if a
+        )
+        mapping = {
+            "entry_type": "inproceedings" if is_conf else "article",
+            "author": author_str,
+            "title": info.get("title", [""])[0] if info.get("title") else "",
+            "booktitle": info.get("container-title", [""])[0] if info.get("container-title") else "",
+            "journal": info.get("container-title", [""])[0] if info.get("container-title") else "",
+            "year": str(
+                info.get("published-print", {}).get("date-parts", [[""]])[0][0]
+                if info.get("published-print")
+                else info.get("created", {}).get("date-parts", [[""]])[0][0]
+            ),
+            "pages": info.get("page", ""),
+            "volume": info.get("volume", ""),
+            "number": info.get("issue", ""),
+            "key": (info.get("DOI", doi) or "doi").replace("/", "-"),
+        }
+        return mapping
+
+    def _batch_generate(self) -> None:
+        lines = [ln.strip() for ln in self.batch_box.get("1.0", "end").splitlines() if ln.strip()]
+        if not lines:
+            messagebox.showinfo("提示", "请输入批量 DOI 或标题")
+            return
+        outputs: List[str] = []
+        for idx, line in enumerate(lines, start=1):
+            if "/" in line or line.lower().startswith("10."):
+                self.doi_entry.delete(0, "end")
+                self.doi_entry.insert(0, line)
+                info = self._fetch_doi()
+            else:
+                info = {"entry_type": "article", "title": line, "author": "", "key": f"entry{idx}"}
+                self.mode.set("期刊")
+                self._render_fields()
+                self.entries["title"].insert(0, line)
+                self.entries["key"].insert(0, f"entry{idx}")
+            if info:
+                outputs.append(self._build_body(info))
+        self.output.configure(state="normal")
+        self.output.delete("1.0", "end")
+        self.output.insert("end", "\n\n".join(outputs))
+        self.output.configure(state="disabled")
+
+    def _build_body(self, info: Dict[str, str]) -> str:
+        is_conf = info.get("entry_type") == "inproceedings"
+        defaults = {
+            "author": "",
+            "title": "",
+            "booktitle": "",
+            "journal": "",
+            "year": "",
+            "pages": "",
+            "volume": "",
+            "number": "",
+        }
+        for key, default in defaults.items():
+            info.setdefault(key, default)
+        template_conf = """@inproceedings{{{key},
+  author = {{{author}}},
+  title = {{{title}}},
+  booktitle = {{{booktitle}}},
+  year = {{{year}}},
+  pages = {{{pages}}}
+}}"""
+        template_jour = """@article{{{key},
+  author = {{{author}}},
+  title = {{{title}}},
+  journal = {{{journal}}},
+  volume = {{{volume}}},
+  number = {{{number}}},
+  year = {{{year}}},
+  pages = {{{pages}}}
+}}"""
+        tpl = template_conf if is_conf else template_jour
+        return tpl.format(**info)
+
 
 class FigureComposerFrame(ctk.CTkFrame):
-    """高 DPI 科研拼图工具。"""
+    """高 DPI 科研拼图工具，提供字体/背景/边框等精细设置。"""
 
     def __init__(self, master: ctk.CTkBaseClass) -> None:
         super().__init__(master)
@@ -287,14 +422,28 @@ class FigureComposerFrame(ctk.CTkFrame):
         ctk.CTkCheckBox(font_row, text="粗体", variable=self.bold_var).grid(row=0, column=3, padx=4)
         ctk.CTkCheckBox(font_row, text="斜体", variable=self.italic_var).grid(row=0, column=4, padx=4)
 
+        styling_row = ctk.CTkFrame(self)
+        styling_row.grid(row=5, column=0, pady=6)
+        ctk.CTkLabel(styling_row, text="背景色 #RRGGBB").grid(row=0, column=0, padx=4)
+        self.bg_entry = ctk.CTkEntry(styling_row, width=100)
+        self.bg_entry.insert(0, "#121212")
+        self.bg_entry.grid(row=0, column=1, padx=4)
+        ctk.CTkLabel(styling_row, text="边框像素").grid(row=0, column=2, padx=4)
+        self.border_entry = ctk.CTkEntry(styling_row, width=80)
+        self.border_entry.insert(0, "0")
+        self.border_entry.grid(row=0, column=3, padx=4)
+        ctk.CTkLabel(styling_row, text="子标签位置").grid(row=0, column=4, padx=4)
+        self.label_pos = ctk.CTkOptionMenu(styling_row, values=["左上", "底部居中"])
+        self.label_pos.grid(row=0, column=5, padx=4)
+
         dpi_row = ctk.CTkFrame(self)
-        dpi_row.grid(row=5, column=0, pady=6)
+        dpi_row.grid(row=6, column=0, pady=6)
         ctk.CTkLabel(dpi_row, text="DPI：").grid(row=0, column=0)
         self.dpi_option = ctk.CTkOptionMenu(dpi_row, values=["72", "150", "300", "600"])
         self.dpi_option.set("300")
         self.dpi_option.grid(row=0, column=1, padx=4)
 
-        ctk.CTkButton(self, text="生成并保存", command=self._compose).grid(row=6, column=0, pady=10)
+        ctk.CTkButton(self, text="生成并保存", command=self._compose).grid(row=7, column=0, pady=10)
 
     def _choose_files(self) -> None:
         files = filedialog.askopenfilenames(title="选择图片", filetypes=[("Images", "*.png *.jpg *.jpeg")])
@@ -312,8 +461,9 @@ class FigureComposerFrame(ctk.CTkFrame):
             pad = int(self.pad_entry.get() or 10)
             dpi = int(self.dpi_option.get())
             font_size = int(self.font_size.get() or 40)
+            border = int(self.border_entry.get() or 0)
         except ValueError:
-            messagebox.showinfo("提示", "行/列/间距/DPI/字号需要为数字")
+            messagebox.showinfo("提示", "行/列/间距/DPI/字号/边框需要为数字")
             return
 
         images = [Image.open(p) for p in self.images]
@@ -326,37 +476,47 @@ class FigureComposerFrame(ctk.CTkFrame):
         font = self._resolve_font(self.font_family.get(), font_size, self.bold_var.get(), self.italic_var.get())
 
         title_height = font_size + 10 if title_text else 0
-        canvas_w = cols * base_w + (cols + 1) * pad
-        canvas_h = rows * base_h + (rows + 1) * pad + title_height
-        canvas = Image.new("RGB", (canvas_w, canvas_h), color=(18, 18, 18))
+        canvas_w = cols * base_w + (cols + 1) * pad + 2 * border
+        canvas_h = rows * base_h + (rows + 1) * pad + title_height + 2 * border
+        bg_color = self._parse_color(self.bg_entry.get())
+        canvas = Image.new("RGB", (canvas_w, canvas_h), color=bg_color)
         draw = ImageDraw.Draw(canvas)
 
+        y_offset = border
         if title_text:
             tw, th = draw.textsize(title_text, font=font)
-            draw.text(((canvas_w - tw) / 2, pad), title_text, font=font, fill="white", stroke_width=1, stroke_fill="black")
-            y_offset = title_height
-        else:
-            y_offset = 0
+            draw.text(((canvas_w - tw) / 2, border + pad), title_text, font=font, fill="white", stroke_width=1, stroke_fill="black")
+            y_offset += title_height
 
         for idx in range(rows * cols):
             if idx >= len(resized):
                 break
             r = idx // cols
             c = idx % cols
-            x = pad + c * (base_w + pad)
+            x = border + pad + c * (base_w + pad)
             y = y_offset + pad + r * (base_h + pad)
             canvas.paste(resized[idx], (x, y))
             if self.sublabel_var.get():
                 label = f"({chr(97 + idx)})"
-                draw.text((x + 10, y + 10), label, font=font, fill="black", stroke_width=1, stroke_fill="white")
+                pos = (x + 10, y + 10)
+                if self.label_pos.get() == "底部居中":
+                    tw, th = draw.textsize(label, font=font)
+                    pos = (x + (base_w - tw) / 2, y + base_h - th - 10)
+                draw.text(pos, label, font=font, fill="black", stroke_width=1, stroke_fill="white")
 
         save_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG", "*.png")])
         if save_path:
             canvas.save(save_path, dpi=(dpi, dpi))
             messagebox.showinfo("完成", "已输出高分辨率拼图")
 
-    def _font_path(self, name: str, bold: bool, italic: bool) -> Optional[str]:
-        # 简化处理：macOS 常见字体路径，尽量匹配粗体/斜体
+    def _parse_color(self, text: str) -> tuple[int, int, int]:
+        try:
+            text = text.lstrip("#")
+            return tuple(int(text[i : i + 2], 16) for i in (0, 2, 4))
+        except Exception:
+            return (18, 18, 18)
+
+    def _font_path(self, name: str, bold: bool, italic: bool) -> str | None:
         mapping = {
             ("Arial", False, False): "/Library/Fonts/Arial.ttf",
             ("Arial", True, False): "/Library/Fonts/Arial Bold.ttf",

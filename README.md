@@ -8,10 +8,10 @@ CampusStudyHub is a lightweight, local CustomTkinter application that helps comp
 - **File organization & stats:** scan/move study files into `Course/Semester/Type/` and export indexes; see course/status counts.
 - **学校事项（School）:** GPA 计算器（必修/选修区分，专业 GPA 和总体 GPA）。
 - **科研辅助（Research）:**
-  - 会议通知：管理同行列表、筛选/新增会议并定向 LAN 提醒。
-  - 实验监控：监听本地日志关键词，异常或完成时向选定同行发送 LAN 提示。
-  - BibTeX 生成：会议/期刊模板切换，动态字段校验。
-  - 科研拼图：统一分辨率、可选 DPI/字体/粗斜体、自动 (a)(b) 子图标签。
+  - 会议通知：本地/网络来源切换、定时刷新、星标“我的关注”、提前提醒，支持 LAN+邮件双通道。
+  - 实验监控：多日志并行监控，错误/收敛关键词分组，尾部快照、简单指标解析与 CSV 导出，可手动/自动提醒。
+  - BibTeX 生成：会议/期刊模板切换，DOI 抓取（带缓存）、批量生成，字段校验与手动编辑。
+  - 科研拼图：统一分辨率、可选 DPI/字体/粗斜体、背景色/边框/子标签位置，自动 (a)(b) 标签。
 - **其他（Others）:** 番茄钟（精确倒计时、进度条、沉浸静音模式、北京时间展示、可自定义时长）。
 
 ## Requirements
@@ -61,7 +61,7 @@ CampusStudyHub is a lightweight, local CustomTkinter application that helps comp
    ```bash
    python main.py
    ```
-5. **Data files:** On first run, the app will create a `data/` directory with `config.json`, `tasks.json`, and `conferences.json`. File indexes are exported to `data/files_index.csv`; GPA 条目保存在 `data/grades.json`；实验/阅读记录保存在 `data/experiments.json` 与 `data/papers.json`，可一键导出 `data/research_summary.md`。
+5. **Data files:** On first run, the app will create a `data/` directory with `config.json`, `tasks.json`, and `conferences.json`. File indexes are exported to `data/files_index.csv`; GPA 条目保存在 `data/grades.json`；实验/阅读记录保存在 `data/experiments.json` 与 `data/papers.json`，可一键导出 `data/research_summary.md`。会议爬取源存放在 `config.json` 的 `conference_sources`；DOI 缓存保存在 `data/bib_cache.json`；日志监控配置保存在 `data/log_monitors.json`。
 
 ## Project structure
 

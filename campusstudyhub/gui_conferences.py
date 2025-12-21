@@ -115,7 +115,10 @@ class ConferencesFrame(ttk.Frame):
     def _refresh_lan_listbox(self) -> None:
         self.lan_list.delete(0, tk.END)
         for target in self.config.lan_targets:
-            self.lan_list.insert(tk.END, f"{target.label} ({target.host}:{target.port})")
+            suffix = f"{target.host}:{target.port}" if target.port else target.host
+            if target.email:
+                suffix += f" | {target.email}"
+            self.lan_list.insert(tk.END, f"{target.label} ({suffix})")
 
     def refresh_list(self) -> None:
         """Refresh displayed conferences according to filters."""
@@ -259,7 +262,13 @@ class ConferencesFrame(ttk.Frame):
             for c in due_items
         ]
         message = "CampusStudyHub conference alert\n" + "\n".join(lines)
-        results = send_lan_notifications(message, self.config.lan_targets)
+        results = send_lan_notifications(
+            message,
+            self.config.lan_targets,
+            smtp_host=self.config.smtp_host,
+            smtp_port=self.config.smtp_port,
+            smtp_sender=self.config.smtp_sender,
+        )
 
         success = [r for r in results if r[1]]
         failed = [r for r in results if not r[1]]
@@ -304,19 +313,24 @@ class LanTargetsDialog(tk.Toplevel):
         ttk.Button(btns, text="Save", command=self._save).pack(side=tk.RIGHT, padx=4)
 
     def _add_target(self) -> None:
-        row = simpledialog.askstring("New target", "Label,host,port (comma separated)", parent=self)
+        row = simpledialog.askstring("New target", "Label,host,port,email (逗号分隔，端口或邮箱留空均可)", parent=self)
         if not row:
             return
         try:
-            label, host, port = [part.strip() for part in row.split(",")]
-            port_int = int(port)
+            parts = [part.strip() for part in row.split(",")]
+            label, host = parts[0], parts[1]
+            port_int = int(parts[2]) if len(parts) > 2 and parts[2] else None
+            email = parts[3] if len(parts) > 3 else ""
         except ValueError:
-            messagebox.showerror("Invalid", "Format: label,host,port")
+            messagebox.showerror("Invalid", "Format: label,host,port,email")
             return
         from .models import LanTarget  # local import to avoid cycle
 
-        self.targets.append(LanTarget(label=label, host=host, port=port_int))
-        self.listbox.insert(tk.END, f"{label} ({host}:{port_int})")
+        self.targets.append(LanTarget(label=label, host=host, port=port_int, email=email))
+        suffix = f"{host}:{port_int}" if port_int else host
+        if email:
+            suffix += f" | {email}"
+        self.listbox.insert(tk.END, f"{label} ({suffix})")
 
     def _remove_target(self) -> None:
         selection = self.listbox.curselection()

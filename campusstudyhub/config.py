@@ -21,6 +21,10 @@ class AppConfig:
     upcoming_window_days: int = 7
     conference_window_days: int = 30
     lan_targets: List[LanTarget] = field(default_factory=list)
+    smtp_host: str = "localhost"
+    smtp_port: int = 25
+    smtp_sender: str = "campusstudyhub@example.com"
+    conference_sources: List[str] = field(default_factory=list)
 
     @classmethod
     def default(cls) -> "AppConfig":
@@ -32,7 +36,14 @@ class AppConfig:
             courses=["Computer Science", "Mathematics", "Physics"],
             upcoming_window_days=7,
             conference_window_days=30,
-            lan_targets=[LanTarget(label="Localhost (example)", host="127.0.0.1", port=5055)],
+            lan_targets=[LanTarget(label="Localhost (example)", host="127.0.0.1", port=5055, email="")],
+            smtp_host="localhost",
+            smtp_port=25,
+            smtp_sender="campusstudyhub@example.com",
+            conference_sources=[
+                "https://dblp.org/search/publ/rss?q=CCF+A+deadline",
+                "https://eventseer.net/rss/cs",
+            ],
         )
 
 
@@ -86,6 +97,10 @@ def _config_from_dict(raw: dict) -> AppConfig:
         upcoming_window_days=raw.get("upcoming_window_days", 7),
         conference_window_days=raw.get("conference_window_days", 30),
         lan_targets=lan_targets or AppConfig.default().lan_targets,
+        smtp_host=raw.get("smtp_host", "localhost"),
+        smtp_port=raw.get("smtp_port", 25),
+        smtp_sender=raw.get("smtp_sender", "campusstudyhub@example.com"),
+        conference_sources=raw.get("conference_sources", AppConfig.default().conference_sources),
     )
 
 

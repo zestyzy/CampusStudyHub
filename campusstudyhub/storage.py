@@ -13,6 +13,7 @@ from .models import (
     ExperimentEntry,
     FileIndexEntry,
     GradeEntry,
+    LogMonitorConfig,
     PaperEntry,
     Task,
 )
@@ -24,6 +25,8 @@ GRADES_PATH = DATA_DIR / "grades.json"
 EXPERIMENTS_PATH = DATA_DIR / "experiments.json"
 PAPERS_PATH = DATA_DIR / "papers.json"
 RESEARCH_MD_PATH = DATA_DIR / "research_summary.md"
+BIB_CACHE_PATH = DATA_DIR / "bib_cache.json"
+LOG_MONITORS_PATH = DATA_DIR / "log_monitors.json"
 
 
 def load_tasks() -> List[Task]:
@@ -158,7 +161,17 @@ def load_conferences() -> List[ConferenceEvent]:
     try:
         with CONFERENCES_PATH.open("r", encoding="utf-8") as f:
             raw = json.load(f)
-        return [ConferenceEvent.from_dict(item) for item in raw]
+        conferences: List[ConferenceEvent] = []
+        for item in raw:
+            try:
+                conferences.append(ConferenceEvent.from_dict(item))
+            except TypeError:
+                # tolerate missing fields from older versions
+                item.setdefault("starred", False)
+                item.setdefault("remind_before_days", 7)
+                item.setdefault("source", "local")
+                conferences.append(ConferenceEvent.from_dict(item))
+        return conferences
     except Exception:
         return default_conferences()
 
@@ -170,6 +183,27 @@ def save_conferences(conferences: List[ConferenceEvent]) -> None:
     serializable = [c.to_dict() for c in conferences]
     with CONFERENCES_PATH.open("w", encoding="utf-8") as f:
         json.dump(serializable, f, indent=2)
+
+
+def load_bib_cache() -> dict:
+    """Load cached DOI metadata for BibTeX generation."""
+
+    ensure_data_dir()
+    if not BIB_CACHE_PATH.exists():
+        return {}
+    try:
+        with BIB_CACHE_PATH.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_bib_cache(cache: dict) -> None:
+    """Persist DOI cache to disk."""
+
+    ensure_data_dir()
+    with BIB_CACHE_PATH.open("w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=2, ensure_ascii=False)
 
 
 def load_grades() -> List[GradeEntry]:
@@ -216,6 +250,29 @@ def save_experiments(entries: List[ExperimentEntry]) -> None:
     serializable = [e.to_dict() for e in entries]
     with EXPERIMENTS_PATH.open("w", encoding="utf-8") as f:
         json.dump(serializable, f, indent=2)
+
+
+def load_log_monitors() -> List[LogMonitorConfig]:
+    """Load saved log monitor configurations for experiment monitoring."""
+
+    ensure_data_dir()
+    if not LOG_MONITORS_PATH.exists():
+        return []
+    try:
+        with LOG_MONITORS_PATH.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return [LogMonitorConfig.from_dict(item) for item in raw]
+    except Exception:
+        return []
+
+
+def save_log_monitors(monitors: List[LogMonitorConfig]) -> None:
+    """Persist log monitor definitions to disk."""
+
+    ensure_data_dir()
+    payload = [m.to_dict() for m in monitors]
+    with LOG_MONITORS_PATH.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
 
 
 def load_papers() -> List[PaperEntry]:

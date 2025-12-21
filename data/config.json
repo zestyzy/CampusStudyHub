@@ -7,11 +7,19 @@
   ],
   "upcoming_window_days": 7,
   "conference_window_days": 30,
+  "conference_sources": [
+    "https://dblp.org/search/publ/rss?q=CCF+A+deadline",
+    "https://eventseer.net/rss/cs"
+  ],
   "lan_targets": [
     {
       "label": "Localhost (example)",
       "host": "127.0.0.1",
-      "port": 5055
+      "port": 5055,
+      "email": ""
     }
-  ]
+  ],
+  "smtp_host": "localhost",
+  "smtp_port": 25,
+  "smtp_sender": "campusstudyhub@example.com"
 }

@@ -79,6 +79,9 @@ class ConferenceEvent:
     location: str = ""
     url: str = ""
     note: str = ""
+    starred: bool = False
+    remind_before_days: int = 7
+    source: str = "local"
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def to_dict(self) -> dict:
@@ -105,11 +108,16 @@ class ConferenceEvent:
 
 @dataclass
 class LanTarget:
-    """Represents a LAN notification recipient."""
+    """Represents a LAN notification recipient.
+
+    The recipient can be reached by UDP (host/port), email, or both. If both
+    contact channels are provided, notifications will attempt both.
+    """
 
     label: str
     host: str
-    port: int
+    port: int | None = None
+    email: str = ""
 
 
 @dataclass
@@ -146,6 +154,25 @@ class ExperimentEntry:
 
     @classmethod
     def from_dict(cls, raw: dict) -> "ExperimentEntry":
+        return cls(**raw)
+
+
+@dataclass
+class LogMonitorConfig:
+    """Represents one monitored log file with keyword groups."""
+
+    path: str
+    keywords_error: List[str] = field(default_factory=list)
+    keywords_success: List[str] = field(default_factory=list)
+    interval: float = 2.0
+    tail_lines: int = 20
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> "LogMonitorConfig":
         return cls(**raw)
 
 
