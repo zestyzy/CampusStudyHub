@@ -10,7 +10,7 @@ CampusStudyHub is a lightweight, local CustomTkinter application that helps comp
 - **科研辅助（Research）:**
   - 会议通知：本地/网络来源切换、定时刷新、星标“我的关注”、提前提醒，支持 LAN+邮件双通道。
   - 实验监控：多日志并行监控，错误/收敛关键词分组，尾部快照、简单指标解析与 CSV 导出，可手动/自动提醒。
-  - 资源监控：一键查看 `gpustat -i`、`top` 与 `df -h` 输出，便于随时检查 GPU/CPU/磁盘状态。
+- 资源监控：一键查看 `gpustat -i`、`top` 与 `df -h` 输出，便于随时检查 GPU/CPU/磁盘状态；在 macOS 无 NVIDIA 时自动提示并尝试 `system_profiler`/`powermetrics` 降级。
   - BibTeX 生成：会议/期刊模板切换，DOI 抓取（带缓存）、批量生成，字段校验与手动编辑。
   - 科研拼图：统一分辨率、可选 DPI/字体/粗斜体、背景色/边框/子标签位置，自动 (a)(b) 标签。
 - **其他（Others）:** 番茄钟（精确倒计时、进度条、沉浸静音模式、北京时间展示、可自定义时长）。
