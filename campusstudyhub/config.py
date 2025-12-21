@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import List
+
+from .models import LanTarget
 
 DATA_DIR = Path("data")
 CONFIG_PATH = DATA_DIR / "config.json"
@@ -17,6 +19,8 @@ class AppConfig:
     base_directory: str
     courses: List[str]
     upcoming_window_days: int = 7
+    conference_window_days: int = 30
+    lan_targets: List[LanTarget] = field(default_factory=list)
 
     @classmethod
     def default(cls) -> "AppConfig":
@@ -24,9 +28,11 @@ class AppConfig:
         home = Path.home()
         default_base = str(home / "CampusStudyMaterials")
         return cls(
-            base_directory=default_base,
+            base_directory=_normalize_base_directory(default_base),
             courses=["Computer Science", "Mathematics", "Physics"],
             upcoming_window_days=7,
+            conference_window_days=30,
+            lan_targets=[LanTarget(label="Localhost (example)", host="127.0.0.1", port=5055)],
         )
 
 
@@ -46,7 +52,7 @@ def load_config() -> AppConfig:
     try:
         with CONFIG_PATH.open("r", encoding="utf-8") as f:
             raw = json.load(f)
-        return AppConfig(**raw)
+        return _config_from_dict(raw)
     except Exception:
         # On error, fall back to defaults but do not overwrite existing file.
         return AppConfig.default()
@@ -55,5 +61,38 @@ def load_config() -> AppConfig:
 def save_config(config: AppConfig) -> None:
     """Persist configuration to disk."""
     ensure_data_dir()
+    config.base_directory = _normalize_base_directory(config.base_directory)
+    serializable = asdict(config)
     with CONFIG_PATH.open("w", encoding="utf-8") as f:
-        json.dump(asdict(config), f, indent=2)
+        json.dump(serializable, f, indent=2)
+
+
+def _config_from_dict(raw: dict) -> AppConfig:
+    """Safely build AppConfig from a dict, tolerating missing keys."""
+
+    lan_targets_raw = raw.get("lan_targets", []) or []
+    lan_targets = []
+    for item in lan_targets_raw:
+        try:
+            lan_targets.append(LanTarget(**item))
+        except TypeError:
+            continue
+
+    return AppConfig(
+        base_directory=_normalize_base_directory(
+            raw.get("base_directory", AppConfig.default().base_directory)
+        ),
+        courses=raw.get("courses", AppConfig.default().courses),
+        upcoming_window_days=raw.get("upcoming_window_days", 7),
+        conference_window_days=raw.get("conference_window_days", 30),
+        lan_targets=lan_targets or AppConfig.default().lan_targets,
+    )
+
+
+def _normalize_base_directory(path_str: str) -> str:
+    """Return a user-expanded base directory string without requiring it to exist."""
+
+    try:
+        return str(Path(path_str).expanduser())
+    except Exception:
+        return path_str

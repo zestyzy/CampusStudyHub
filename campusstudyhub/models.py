@@ -67,3 +67,62 @@ class FileIndexEntry:
 def format_datetime(ts: float) -> str:
     """Format a timestamp to a readable string."""
     return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+
+
+@dataclass
+class ConferenceEvent:
+    """Represents a CCF-related conference deadline."""
+
+    name: str
+    category: str
+    submission_deadline: str
+    location: str = ""
+    url: str = ""
+    note: str = ""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ConferenceEvent":
+        return cls(**data)
+
+    def is_due_within(self, days: int) -> bool:
+        try:
+            due = date.fromisoformat(self.submission_deadline)
+        except ValueError:
+            return False
+        return 0 <= (due - date.today()).days <= days
+
+    def is_overdue(self) -> bool:
+        try:
+            due = date.fromisoformat(self.submission_deadline)
+        except ValueError:
+            return False
+        return due < date.today()
+
+
+@dataclass
+class LanTarget:
+    """Represents a LAN notification recipient."""
+
+    label: str
+    host: str
+    port: int
+
+
+@dataclass
+class GradeEntry:
+    """Represents one course grade used for GPA calculation."""
+
+    course: str
+    credit: float
+    score: float
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> "GradeEntry":
+        return cls(**raw)

@@ -82,7 +82,7 @@ class FilesFrame(ttk.Frame):
             self.base_dir_var.set(chosen)
 
     def _save_base_dir(self) -> None:
-        path = self.base_dir_var.get().strip()
+        path = str(Path(self.base_dir_var.get().strip()).expanduser())
         if not path:
             messagebox.showerror("Base directory", "Please select a valid directory.")
             return
@@ -91,7 +91,7 @@ class FilesFrame(ttk.Frame):
         messagebox.showinfo("Saved", "Base directory updated.")
 
     def _scan_files(self) -> None:
-        base = Path(self.base_dir_var.get())
+        base = Path(self.base_dir_var.get()).expanduser()
         self.scanned_files = scan_files(base)
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -119,7 +119,7 @@ class FilesFrame(ttk.Frame):
         if not messagebox.askyesno("Confirm", f"Move {len(selected)} files into course folder?"):
             return
 
-        base_dir = Path(self.base_dir_var.get())
+        base_dir = Path(self.base_dir_var.get()).expanduser()
         moved_count = 0
         for iid in selected:
             source = Path(iid)
@@ -138,7 +138,7 @@ class FilesFrame(ttk.Frame):
             messagebox.showinfo("Export", "Please scan files first.")
             return
         entries: List[FileIndexEntry] = []
-        base = Path(self.base_dir_var.get())
+        base = Path(self.base_dir_var.get()).expanduser()
         for path in self.scanned_files:
             stats = path.stat()
             # Infer course/type from path structure where possible.

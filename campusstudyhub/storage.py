@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import List, Optional
 
 from .config import DATA_DIR, ensure_data_dir
-from .models import FileIndexEntry, Task
+from .models import ConferenceEvent, FileIndexEntry, GradeEntry, Task
 
 TASKS_PATH = DATA_DIR / "tasks.json"
 FILES_INDEX_PATH = DATA_DIR / "files_index.csv"
+CONFERENCES_PATH = DATA_DIR / "conferences.json"
+GRADES_PATH = DATA_DIR / "grades.json"
 
 
 def load_tasks() -> List[Task]:
@@ -84,3 +86,100 @@ def export_file_index(entries: List[FileIndexEntry]) -> None:
         writer.writerow(["course", "type", "filename", "full_path", "modified"])
         for entry in entries:
             writer.writerow(entry.to_csv_row())
+
+
+def default_conferences() -> List[ConferenceEvent]:
+    """Provide a short built-in list of CCF-related conferences."""
+
+    defaults = [
+        {
+            "name": "AAAI",
+            "category": "CCF-A",
+            "submission_deadline": "2025-08-15",
+            "location": "North America",
+            "url": "https://aaai.org",
+            "note": "AI flagship",
+        },
+        {
+            "name": "CVPR",
+            "category": "CCF-A",
+            "submission_deadline": "2025-11-15",
+            "location": "International",
+            "url": "https://cvpr.thecvf.com",
+            "note": "Computer vision",
+        },
+        {
+            "name": "ICML",
+            "category": "CCF-A",
+            "submission_deadline": "2025-01-20",
+            "location": "International",
+            "url": "https://icml.cc",
+            "note": "Machine learning",
+        },
+        {
+            "name": "SIGIR",
+            "category": "CCF-A",
+            "submission_deadline": "2025-02-01",
+            "location": "International",
+            "url": "https://sigir.org",
+            "note": "Information retrieval",
+        },
+        {
+            "name": "IJCAI",
+            "category": "CCF-A",
+            "submission_deadline": "2025-01-10",
+            "location": "International",
+            "url": "https://ijcai.org",
+            "note": "AI conference",
+        },
+    ]
+    return [ConferenceEvent.from_dict(item) for item in defaults]
+
+
+def load_conferences() -> List[ConferenceEvent]:
+    """Load conference deadlines from disk, seeding defaults if missing."""
+
+    ensure_data_dir()
+    if not CONFERENCES_PATH.exists():
+        defaults = default_conferences()
+        save_conferences(defaults)
+        return defaults
+
+    try:
+        with CONFERENCES_PATH.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return [ConferenceEvent.from_dict(item) for item in raw]
+    except Exception:
+        return default_conferences()
+
+
+def save_conferences(conferences: List[ConferenceEvent]) -> None:
+    """Persist conferences to disk."""
+
+    ensure_data_dir()
+    serializable = [c.to_dict() for c in conferences]
+    with CONFERENCES_PATH.open("w", encoding="utf-8") as f:
+        json.dump(serializable, f, indent=2)
+
+
+def load_grades() -> List[GradeEntry]:
+    """Load GPA entries from disk."""
+
+    ensure_data_dir()
+    if not GRADES_PATH.exists():
+        return []
+    try:
+        with GRADES_PATH.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+        return [GradeEntry.from_dict(item) for item in raw]
+    except Exception:
+        return []
+
+
+def save_grades(entries: List[GradeEntry]) -> None:
+    """Persist GPA rows to disk."""
+
+    ensure_data_dir()
+    serializable = [e.to_dict() for e in entries]
+    with GRADES_PATH.open("w", encoding="utf-8") as f:
+        json.dump(serializable, f, indent=2)

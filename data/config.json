@@ -5,5 +5,13 @@
     "Mathematics",
     "Physics"
   ],
-  "upcoming_window_days": 7
+  "upcoming_window_days": 7,
+  "conference_window_days": 30,
+  "lan_targets": [
+    {
+      "label": "Localhost (example)",
+      "host": "127.0.0.1",
+      "port": 5055
+    }
+  ]
 }

@@ -11,6 +11,11 @@ from .storage import load_tasks
 from .gui_tasks import TasksFrame
 from .gui_files import FilesFrame
 from .gui_stats import StatsFrame
+from .gui_conferences import ConferencesFrame
+from .gui_plot import FigureComposer
+from .gui_pomodoro import PomodoroTimer
+from .gui_gpa import GPACalculator
+from .gui_bibtex import BibtexGenerator
 
 
 class App(tk.Tk):
@@ -50,6 +55,25 @@ class App(tk.Tk):
         self.stats_frame = StatsFrame(notebook, tasks_provider=self._get_tasks)
         notebook.add(self.stats_frame, text="Stats")
 
+        self.conf_frame = ConferencesFrame(
+            notebook,
+            config=self.config_data,
+            on_config_update=self._update_config,
+        )
+        notebook.add(self.conf_frame, text="CCF Conferences")
+
+        self.figure_frame = FigureComposer(notebook)
+        notebook.add(self.figure_frame, text="Figure Tool")
+
+        self.pomodoro_frame = PomodoroTimer(notebook)
+        notebook.add(self.pomodoro_frame, text="Pomodoro")
+
+        self.gpa_frame = GPACalculator(notebook)
+        notebook.add(self.gpa_frame, text="GPA Calc")
+
+        self.bib_frame = BibtexGenerator(notebook)
+        notebook.add(self.bib_frame, text="BibTeX")
+
     def _update_tasks(self, tasks: List[Task]) -> None:
         """Callback when tasks change."""
         self.tasks = tasks
@@ -61,6 +85,7 @@ class App(tk.Tk):
         save_config(config)
         self.tasks_frame.refresh_config(config)
         self.files_frame.refresh_config(config)
+        self.conf_frame.refresh_config(config)
 
     def _get_tasks(self) -> List[Task]:
         return self.tasks
