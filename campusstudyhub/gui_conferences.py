@@ -30,27 +30,37 @@ class ConferencesFrame(ttk.Frame):
         self.refresh_list()
 
     def _build_widgets(self) -> None:
-        controls = ttk.Frame(self)
+        controls = ttk.LabelFrame(self, text="会议筛选", padding=8)
         controls.pack(fill=tk.X, pady=(0, 8))
+        for idx in range(8):
+            controls.columnconfigure(idx, weight=1)
 
-        ttk.Label(controls, text="等级：").pack(side=tk.LEFT)
-        self.category_filter = ttk.Combobox(controls, values=["全部", "CCF-A", "CCF-B", "CCF-C"], state="readonly", width=10)
+        ttk.Label(controls, text="等级：").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.category_filter = ttk.Combobox(
+            controls, values=["全部", "CCF-A", "CCF-B", "CCF-C"], state="readonly", width=10
+        )
         self.category_filter.set("全部")
-        self.category_filter.pack(side=tk.LEFT, padx=5)
+        self.category_filter.grid(row=0, column=1, sticky=tk.W, padx=4, pady=2)
 
-        ttk.Label(controls, text="截止天数：").pack(side=tk.LEFT)
-        self.window_entry = ttk.Entry(controls, width=6)
+        ttk.Label(controls, text="截止天数：").grid(row=0, column=2, sticky=tk.W, pady=2)
+        self.window_entry = ttk.Entry(controls, width=8)
         self.window_entry.insert(0, str(self.config.conference_window_days))
-        self.window_entry.pack(side=tk.LEFT)
+        self.window_entry.grid(row=0, column=3, sticky=tk.W, pady=2)
 
         self.show_all_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(controls, text="显示全部", variable=self.show_all_var, command=self.refresh_list).pack(
-            side=tk.LEFT, padx=6
+        ttk.Checkbutton(controls, text="显示全部", variable=self.show_all_var, command=self.refresh_list).grid(
+            row=0, column=4, sticky=tk.W, padx=4, pady=2
         )
 
-        ttk.Button(controls, text="应用筛选", command=self.refresh_list).pack(side=tk.LEFT, padx=5)
-        ttk.Button(controls, text="发送提醒", command=self._send_lan).pack(side=tk.LEFT, padx=5)
-        ttk.Button(controls, text="选择会议发送", command=self._pick_and_send).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="应用筛选", command=self.refresh_list, width=10).grid(
+            row=0, column=5, sticky=tk.E, padx=4, pady=2
+        )
+        ttk.Button(controls, text="发送提醒", command=self._send_lan, width=10).grid(
+            row=0, column=6, sticky=tk.E, padx=4, pady=2
+        )
+        ttk.Button(controls, text="选择会议发送", command=self._pick_and_send, width=14).grid(
+            row=0, column=7, sticky=tk.E, padx=4, pady=2
+        )
 
         main = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         main.pack(fill=tk.BOTH, expand=True)
@@ -266,7 +276,13 @@ class ConferencesFrame(ttk.Frame):
             due_items = picked
 
         if not due_items:
-            messagebox.showinfo("暂无可发送的会议", "请选择会议或扩大截止天数范围后再试。")
+            # 当前筛选无匹配时，直接引导用户手动勾选要发送的会议
+            dialog = ConferencePickDialog(self, self.conferences)
+            self.wait_window(dialog)
+            if dialog.result:
+                self._dispatch_notifications(dialog.result)
+            else:
+                messagebox.showinfo("暂无可发送的会议", "请选择会议或调整筛选条件后再试。")
             return
 
         self._dispatch_notifications(due_items)
