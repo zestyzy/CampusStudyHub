@@ -17,11 +17,11 @@ class StatsFrame(ttk.Frame):
         super().__init__(master, padding=10)
         self.tasks_provider = tasks_provider
 
-        self.course_label = ttk.Label(self, text="Tasks per course: -")
+        self.course_label = ttk.Label(self, text="各课程任务数：-")
         self.course_label.pack(anchor=tk.W, pady=5)
-        self.status_label = ttk.Label(self, text="Tasks by status: -")
+        self.status_label = ttk.Label(self, text="按状态统计：-")
         self.status_label.pack(anchor=tk.W, pady=5)
-        self.completion_label = ttk.Label(self, text="Completed in last 7 days: -")
+        self.completion_label = ttk.Label(self, text="近7天完成：-")
         self.completion_label.pack(anchor=tk.W, pady=5)
 
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL, length=300, mode="determinate")
@@ -35,15 +35,15 @@ class StatsFrame(ttk.Frame):
         by_status = Counter(t.status for t in tasks)
 
         self.course_label.config(
-            text="Tasks per course: " + ", ".join(f"{course} ({count})" for course, count in by_course.items() or [("None", 0)])
+            text="各课程任务数：" + ", ".join(f"{course} ({count})" for course, count in by_course.items() or [("无", 0)])
         )
         self.status_label.config(
-            text="Tasks by status: " + ", ".join(f"{status} ({count})" for status, count in by_status.items() or [("None", 0)])
+            text="按状态统计：" + ", ".join(f"{status} ({count})" for status, count in by_status.items() or [("无", 0)])
         )
 
         last_week = date.today() - timedelta(days=7)
         completed_recent = [t for t in tasks if t.status == "done" and self._completed_within(t, last_week)]
-        self.completion_label.config(text=f"Completed in last 7 days: {len(completed_recent)}")
+        self.completion_label.config(text=f"近7天完成：{len(completed_recent)}")
 
         total = len(tasks)
         done = by_status.get("done", 0)

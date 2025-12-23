@@ -34,25 +34,25 @@ class ConferencesFrame(ttk.Frame):
         controls = ttk.Frame(self)
         controls.pack(fill=tk.X, pady=(0, 8))
 
-        ttk.Label(controls, text="Category:").pack(side=tk.LEFT)
-        self.category_filter = ttk.Combobox(controls, values=["All", "CCF-A", "CCF-B", "CCF-C"], state="readonly", width=10)
-        self.category_filter.set("All")
+        ttk.Label(controls, text="等级：").pack(side=tk.LEFT)
+        self.category_filter = ttk.Combobox(controls, values=["全部", "CCF-A", "CCF-B", "CCF-C"], state="readonly", width=10)
+        self.category_filter.set("全部")
         self.category_filter.pack(side=tk.LEFT, padx=5)
 
-        ttk.Label(controls, text="Within days:").pack(side=tk.LEFT)
+        ttk.Label(controls, text="截止天数：").pack(side=tk.LEFT)
         self.window_entry = ttk.Entry(controls, width=6)
         self.window_entry.insert(0, str(self.config.conference_window_days))
         self.window_entry.pack(side=tk.LEFT)
 
-        ttk.Button(controls, text="Apply", command=self.refresh_list).pack(side=tk.LEFT, padx=5)
-        ttk.Button(controls, text="Send LAN reminder", command=self._send_lan).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="应用筛选", command=self.refresh_list).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="发送局域网提醒", command=self._send_lan).pack(side=tk.LEFT, padx=5)
 
         main = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         main.pack(fill=tk.BOTH, expand=True)
 
         list_frame = ttk.Frame(main)
         self._build_table(list_frame)
-        form_frame = ttk.LabelFrame(main, text="Add / Edit", padding=10)
+        form_frame = ttk.LabelFrame(main, text="新增 / 编辑", padding=10)
         self._build_form(form_frame)
 
         main.add(list_frame, weight=2)
@@ -61,7 +61,7 @@ class ConferencesFrame(ttk.Frame):
     def _build_table(self, container: ttk.Frame) -> None:
         columns = ("name", "category", "deadline", "location")
         self.tree = ttk.Treeview(container, columns=columns, show="headings", selectmode="browse")
-        headings = ["Name", "Category", "Submission", "Location"]
+        headings = ["名称", "等级", "截稿", "地点"]
         for col, head in zip(columns, headings):
             self.tree.heading(col, text=head)
             self.tree.column(col, anchor=tk.W, width=140)
@@ -74,7 +74,7 @@ class ConferencesFrame(ttk.Frame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _build_form(self, container: ttk.LabelFrame) -> None:
-        labels = ["Name", "Category", "Submission (YYYY-MM-DD)", "Location", "URL", "Note"]
+        labels = ["名称", "等级", "截稿日期 (YYYY-MM-DD)", "地点", "URL", "备注"]
         for idx, label in enumerate(labels):
             ttk.Label(container, text=label).grid(row=idx, column=0, sticky=tk.W, pady=2)
 
@@ -101,16 +101,16 @@ class ConferencesFrame(ttk.Frame):
 
         btns = ttk.Frame(container)
         btns.grid(row=len(labels), column=0, columnspan=2, pady=8)
-        ttk.Button(btns, text="New", command=self._clear_form).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btns, text="Save", command=self._save_conference).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btns, text="Delete", command=self._delete_conference).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="新建", command=self._clear_form).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="保存", command=self._save_conference).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="删除", command=self._delete_conference).pack(side=tk.LEFT, padx=4)
 
-        targets = ttk.LabelFrame(container, text="LAN Targets", padding=6)
+        targets = ttk.LabelFrame(container, text="局域网联系人", padding=6)
         targets.grid(row=len(labels) + 1, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0))
         self.lan_list = tk.Listbox(targets, height=4)
         self.lan_list.pack(fill=tk.X)
         self._refresh_lan_listbox()
-        ttk.Button(targets, text="Edit targets", command=self._edit_lan_targets).pack(anchor=tk.E, pady=4)
+        ttk.Button(targets, text="管理联系人", command=self._edit_lan_targets).pack(anchor=tk.E, pady=4)
 
     def _refresh_lan_listbox(self) -> None:
         self.lan_list.delete(0, tk.END)
@@ -135,7 +135,7 @@ class ConferencesFrame(ttk.Frame):
 
         filtered: List[ConferenceEvent] = []
         for conf in self.conferences:
-            if category not in ("", "All") and conf.category != category:
+            if category not in ("", "全部") and conf.category != category:
                 continue
             if not conf.is_due_within(window_days) and not conf.is_overdue():
                 continue
@@ -239,7 +239,7 @@ class ConferencesFrame(ttk.Frame):
 
     def _send_lan(self) -> None:
         if not self.config.lan_targets:
-            messagebox.showinfo("No targets", "Please add LAN targets first.")
+            messagebox.showinfo("尚无联系人", "请先添加局域网联系人。")
             return
 
         try:
@@ -308,9 +308,9 @@ class LanTargetsDialog(tk.Toplevel):
 
         btns = ttk.Frame(frame)
         btns.pack(fill=tk.X, pady=6)
-        ttk.Button(btns, text="Add", command=self._add_target).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btns, text="Remove", command=self._remove_target).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btns, text="Save", command=self._save).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(btns, text="新增", command=self._add_target).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="移除", command=self._remove_target).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="保存", command=self._save).pack(side=tk.RIGHT, padx=4)
 
     def _add_target(self) -> None:
         row = simpledialog.askstring("New target", "Label,host,port,email (逗号分隔，端口或邮箱留空均可)", parent=self)

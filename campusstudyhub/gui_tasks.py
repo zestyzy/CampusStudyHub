@@ -1,4 +1,4 @@
-"""Tasks tab UI for CampusStudyHub."""
+"""任务管理页（已本地化为简体中文）。"""
 from __future__ import annotations
 
 import tkinter as tk
@@ -12,7 +12,7 @@ from .storage import add_task, delete_task, save_tasks, update_task
 
 
 class TasksFrame(ttk.Frame):
-    """Frame handling task CRUD and reminders."""
+    """任务增删改查与提醒列表。"""
 
     def __init__(
         self,
@@ -33,28 +33,28 @@ class TasksFrame(ttk.Frame):
         self.refresh_tasks()
 
     def _build_widgets(self) -> None:
-        filter_frame = ttk.LabelFrame(self, text="Filters", padding=10)
+        filter_frame = ttk.LabelFrame(self, text="筛选", padding=10)
         filter_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(filter_frame, text="Course:").grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(filter_frame, text="课程：").grid(row=0, column=0, sticky=tk.W)
         self.course_filter = ttk.Combobox(filter_frame, values=self._course_options(), state="readonly")
-        self.course_filter.set("All")
+        self.course_filter.set("全部")
         self.course_filter.grid(row=0, column=1, padx=5)
 
-        ttk.Label(filter_frame, text="Status:").grid(row=0, column=2, sticky=tk.W)
-        self.status_filter = ttk.Combobox(filter_frame, values=["All"] + TASK_STATUSES, state="readonly")
-        self.status_filter.set("All")
+        ttk.Label(filter_frame, text="状态：").grid(row=0, column=2, sticky=tk.W)
+        self.status_filter = ttk.Combobox(filter_frame, values=["全部"] + TASK_STATUSES, state="readonly")
+        self.status_filter.set("全部")
         self.status_filter.grid(row=0, column=3, padx=5)
 
         self.overdue_only = tk.BooleanVar()
-        ttk.Checkbutton(filter_frame, text="Show only overdue", variable=self.overdue_only).grid(row=0, column=4, padx=5)
+        ttk.Checkbutton(filter_frame, text="仅查看逾期", variable=self.overdue_only).grid(row=0, column=4, padx=5)
 
-        ttk.Button(filter_frame, text="Apply", command=self.refresh_tasks).grid(row=0, column=5, padx=5)
+        ttk.Button(filter_frame, text="应用筛选", command=self.refresh_tasks).grid(row=0, column=5, padx=5)
 
         main_pane = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         main_pane.pack(fill=tk.BOTH, expand=True)
 
-        form_frame = ttk.LabelFrame(main_pane, text="Task Details", padding=10)
+        form_frame = ttk.LabelFrame(main_pane, text="任务详情", padding=10)
         self._build_form(form_frame)
 
         list_frame = ttk.Frame(main_pane)
@@ -63,24 +63,24 @@ class TasksFrame(ttk.Frame):
         main_pane.add(form_frame, weight=1)
         main_pane.add(list_frame, weight=2)
 
-        reminder_frame = ttk.LabelFrame(self, text="Reminders", padding=10)
+        reminder_frame = ttk.LabelFrame(self, text="提醒", padding=10)
         reminder_frame.pack(fill=tk.X, pady=(10, 0))
-        self.upcoming_label = ttk.Label(reminder_frame, text="Upcoming: -")
+        self.upcoming_label = ttk.Label(reminder_frame, text="即将到期：-")
         self.upcoming_label.pack(anchor=tk.W)
-        self.overdue_label = ttk.Label(reminder_frame, text="Overdue: -")
+        self.overdue_label = ttk.Label(reminder_frame, text="已逾期：-")
         self.overdue_label.pack(anchor=tk.W)
-        ttk.Button(reminder_frame, text="Refresh reminders", command=self.refresh_tasks).pack(anchor=tk.E, pady=5)
+        ttk.Button(reminder_frame, text="刷新提醒", command=self.refresh_tasks).pack(anchor=tk.E, pady=5)
 
-        settings_frame = ttk.LabelFrame(self, text="Course Settings", padding=10)
+        settings_frame = ttk.LabelFrame(self, text="课程设置", padding=10)
         settings_frame.pack(fill=tk.X, pady=(10, 0))
-        ttk.Label(settings_frame, text="Courses (comma separated):").grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(settings_frame, text="课程列表（逗号分隔）：").grid(row=0, column=0, sticky=tk.W)
         self.course_settings = tk.Text(settings_frame, height=2, width=60)
         self.course_settings.grid(row=0, column=1, padx=5)
         self.course_settings.insert("1.0", ", ".join(self.config.courses))
-        ttk.Button(settings_frame, text="Save courses", command=self._save_courses).grid(row=0, column=2)
+        ttk.Button(settings_frame, text="保存课程", command=self._save_courses).grid(row=0, column=2)
 
     def _build_form(self, container: ttk.LabelFrame) -> None:
-        labels = ["Title", "Course", "Type", "Due date (YYYY-MM-DD)", "Priority", "Status", "Notes"]
+        labels = ["标题", "课程", "类型", "截止日期 (YYYY-MM-DD)", "优先级", "状态", "备注"]
         for idx, text in enumerate(labels):
             ttk.Label(container, text=text).grid(row=idx, column=0, sticky=tk.W, pady=2)
 
@@ -111,14 +111,14 @@ class TasksFrame(ttk.Frame):
 
         btn_frame = ttk.Frame(container)
         btn_frame.grid(row=len(labels), column=0, columnspan=2, pady=10)
-        ttk.Button(btn_frame, text="New", command=self._clear_form).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Save", command=self._save_task).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="Delete", command=self._delete_task).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="新建", command=self._clear_form).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="保存", command=self._save_task).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="删除", command=self._delete_task).pack(side=tk.LEFT, padx=5)
 
     def _build_task_list(self, container: ttk.Frame) -> None:
         columns = ("title", "course", "due", "priority", "status")
         self.tree = ttk.Treeview(container, columns=columns, show="headings", selectmode="browse")
-        for col, heading in zip(columns, ["Title", "Course", "Due", "Priority", "Status"]):
+        for col, heading in zip(columns, ["标题", "课程", "截止", "优先级", "状态"]):
             self.tree.heading(col, text=heading)
             self.tree.column(col, width=120, anchor=tk.W)
         self.tree.pack(fill=tk.BOTH, expand=True)
@@ -130,7 +130,7 @@ class TasksFrame(ttk.Frame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _course_options(self) -> List[str]:
-        return ["All"] + self.config.courses
+        return ["全部"] + self.config.courses
 
     def refresh_config(self, config: AppConfig) -> None:
         """Update UI when config changes."""
@@ -150,9 +150,9 @@ class TasksFrame(ttk.Frame):
 
         filtered = []
         for task in self.tasks:
-            if course_filter not in ("", "All") and task.course != course_filter:
+            if course_filter not in ("", "全部") and task.course != course_filter:
                 continue
-            if status_filter not in ("", "All") and task.status != status_filter:
+            if status_filter not in ("", "全部") and task.status != status_filter:
                 continue
             if self.overdue_only.get() and not task.is_overdue():
                 continue
@@ -173,10 +173,10 @@ class TasksFrame(ttk.Frame):
     def _update_reminders(self) -> None:
         upcoming = [t for t in self.tasks if t.is_due_within(self.config.upcoming_window_days)]
         overdue = [t for t in self.tasks if t.is_overdue()]
-        upcoming_text = ", ".join(f"{t.title} ({t.due_date})" for t in upcoming) or "None"
-        overdue_text = ", ".join(f"{t.title} ({t.due_date})" for t in overdue) or "None"
-        self.upcoming_label.config(text=f"Upcoming (next {self.config.upcoming_window_days} days): {upcoming_text}")
-        self.overdue_label.config(text=f"Overdue: {overdue_text}")
+        upcoming_text = ", ".join(f"{t.title} ({t.due_date})" for t in upcoming) or "无"
+        overdue_text = ", ".join(f"{t.title} ({t.due_date})" for t in overdue) or "无"
+        self.upcoming_label.config(text=f"即将到期（未来 {self.config.upcoming_window_days} 天）：{upcoming_text}")
+        self.overdue_label.config(text=f"已逾期：{overdue_text}")
 
     def _on_select(self, event: tk.Event) -> None:
         selection = self.tree.selection()
@@ -219,14 +219,14 @@ class TasksFrame(ttk.Frame):
         notes = self.notes_text.get("1.0", tk.END).strip()
 
         if not title or not course or not task_type or not due_date_str:
-            messagebox.showerror("Missing data", "Please fill in title, course, type, and due date.")
+            messagebox.showerror("信息不完整", "请填写标题、课程、类型和截止日期。")
             return
 
         try:
             # Validate date format
             date.fromisoformat(due_date_str)
         except ValueError:
-            messagebox.showerror("Invalid date", "Please use date format YYYY-MM-DD.")
+            messagebox.showerror("日期格式错误", "请使用 YYYY-MM-DD 格式。")
             return
 
         if self.selected_task_id:
@@ -262,9 +262,9 @@ class TasksFrame(ttk.Frame):
 
     def _delete_task(self) -> None:
         if not self.selected_task_id:
-            messagebox.showinfo("Select task", "Please select a task to delete.")
+            messagebox.showinfo("请选择任务", "请先在列表中选择要删除的任务。")
             return
-        if not messagebox.askyesno("Confirm", "Delete selected task?"):
+        if not messagebox.askyesno("确认", "确定删除选中的任务吗？"):
             return
         self.tasks = delete_task(self.tasks, self.selected_task_id)
         self.selected_task_id = None
@@ -276,9 +276,9 @@ class TasksFrame(ttk.Frame):
         raw = self.course_settings.get("1.0", tk.END).strip()
         courses = [c.strip() for c in raw.split(",") if c.strip()]
         if not courses:
-            messagebox.showerror("Courses", "Please provide at least one course name.")
+            messagebox.showerror("课程列表", "请至少填写一个课程名称。")
             return
         self.config.courses = courses
         self.on_config_update(self.config)
-        messagebox.showinfo("Courses", "Course list updated.")
+        messagebox.showinfo("课程列表", "课程列表已更新。")
         self.refresh_config(self.config)
