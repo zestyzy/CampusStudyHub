@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
-from datetime import date
 from typing import Callable, List, Optional
 
 from .config import AppConfig
@@ -44,8 +43,13 @@ class ConferencesFrame(ttk.Frame):
         self.window_entry.insert(0, str(self.config.conference_window_days))
         self.window_entry.pack(side=tk.LEFT)
 
+        self.show_all_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(controls, text="显示全部", variable=self.show_all_var, command=self.refresh_list).pack(
+            side=tk.LEFT, padx=6
+        )
+
         ttk.Button(controls, text="应用筛选", command=self.refresh_list).pack(side=tk.LEFT, padx=5)
-        ttk.Button(controls, text="发送局域网提醒", command=self._send_lan).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="发送提醒", command=self._send_lan).pack(side=tk.LEFT, padx=5)
 
         main = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         main.pack(fill=tk.BOTH, expand=True)
@@ -60,7 +64,7 @@ class ConferencesFrame(ttk.Frame):
 
     def _build_table(self, container: ttk.Frame) -> None:
         columns = ("name", "category", "deadline", "location")
-        self.tree = ttk.Treeview(container, columns=columns, show="headings", selectmode="browse")
+        self.tree = ttk.Treeview(container, columns=columns, show="headings", selectmode="extended")
         headings = ["名称", "等级", "截稿", "地点"]
         for col, head in zip(columns, headings):
             self.tree.heading(col, text=head)
@@ -137,7 +141,7 @@ class ConferencesFrame(ttk.Frame):
         for conf in self.conferences:
             if category not in ("", "全部") and conf.category != category:
                 continue
-            if not conf.is_due_within(window_days) and not conf.is_overdue():
+            if not self.show_all_var.get() and not (conf.is_due_within(window_days) or conf.is_overdue()):
                 continue
             filtered.append(conf)
 
@@ -247,14 +251,21 @@ class ConferencesFrame(ttk.Frame):
         except ValueError:
             window_days = self.config.conference_window_days
 
-        now = date.today().isoformat()
-        due_items = [
-            c
-            for c in self.conferences
-            if c.is_due_within(window_days) or c.is_overdue()
-        ]
+        selection = self.tree.selection()
+        selected_map = {c.id: c for c in self.conferences}
+        picked = [selected_map[iid] for iid in selection if iid in selected_map]
+
+        if not picked:
+            due_items = [
+                c
+                for c in self.conferences
+                if c.is_due_within(window_days) or c.is_overdue()
+            ]
+        else:
+            due_items = picked
+
         if not due_items:
-            messagebox.showinfo("暂无截止", "所选时间范围内没有即将到期的会议。")
+            messagebox.showinfo("暂无可发送的会议", "请选择会议或扩大截止天数范围后再试。")
             return
 
         lines = [f"{c.name} ({c.category}) 截止 {c.submission_deadline}" for c in due_items]
