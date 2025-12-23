@@ -74,7 +74,7 @@ class ConferencesFrame(ttk.Frame):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _build_form(self, container: ttk.LabelFrame) -> None:
-        labels = ["名称", "等级", "截稿日期 (YYYY-MM-DD)", "地点", "URL", "备注"]
+        labels = ["名称", "等级", "截稿日期 (YYYY-MM-DD)", "地点", "链接", "备注"]
         for idx, label in enumerate(labels):
             ttk.Label(container, text=label).grid(row=idx, column=0, sticky=tk.W, pady=2)
 
@@ -195,7 +195,7 @@ class ConferencesFrame(ttk.Frame):
         note = self.note_text.get("1.0", tk.END).strip()
 
         if not name or not deadline:
-            messagebox.showerror("Missing fields", "Name and deadline are required.")
+            messagebox.showerror("缺少必填项", "请填写会议名称和截稿日期。")
             return
 
         if self.selected_id:
@@ -230,7 +230,7 @@ class ConferencesFrame(ttk.Frame):
     def _delete_conference(self) -> None:
         if not self.selected_id:
             return
-        if not messagebox.askyesno("Confirm", "Delete this conference entry?"):
+        if not messagebox.askyesno("确认", "确定要删除这条会议记录吗？"):
             return
         self.conferences = [c for c in self.conferences if c.id != self.selected_id]
         save_conferences(self.conferences)
@@ -254,14 +254,11 @@ class ConferencesFrame(ttk.Frame):
             if c.is_due_within(window_days) or c.is_overdue()
         ]
         if not due_items:
-            messagebox.showinfo("No deadlines", "No upcoming deadlines in the chosen window.")
+            messagebox.showinfo("暂无截止", "所选时间范围内没有即将到期的会议。")
             return
 
-        lines = [
-            f"{c.name} ({c.category}) due {c.submission_deadline}"
-            for c in due_items
-        ]
-        message = "CampusStudyHub conference alert\n" + "\n".join(lines)
+        lines = [f"{c.name} ({c.category}) 截止 {c.submission_deadline}" for c in due_items]
+        message = "CampusStudyHub 会议提醒\n" + "\n".join(lines)
         results = send_lan_notifications(
             message,
             self.config.lan_targets,
@@ -272,10 +269,10 @@ class ConferencesFrame(ttk.Frame):
 
         success = [r for r in results if r[1]]
         failed = [r for r in results if not r[1]]
-        detail = f"Sent: {len(success)}; Failed: {len(failed)}"
+        detail = f"成功发送: {len(success)} 条；失败: {len(failed)} 条"
         if failed:
             detail += "\n" + "\n".join(f"{t.label}: {msg}" for t, _, msg in failed)
-        messagebox.showinfo("LAN notification", detail)
+        messagebox.showinfo("提醒结果", detail)
 
     def _edit_lan_targets(self) -> None:
         dialog = LanTargetsDialog(self, self.config.lan_targets)
@@ -287,11 +284,11 @@ class ConferencesFrame(ttk.Frame):
 
 
 class LanTargetsDialog(tk.Toplevel):
-    """Simple dialog to edit LAN targets list."""
+    """局域网联系人编辑对话框。"""
 
     def __init__(self, master: tk.Widget, targets: List) -> None:
         super().__init__(master)
-        self.title("LAN Targets")
+        self.title("编辑联系人")
         self.result: Optional[List] = None
         self.targets = list(targets)
         self._build_ui()
@@ -313,7 +310,7 @@ class LanTargetsDialog(tk.Toplevel):
         ttk.Button(btns, text="保存", command=self._save).pack(side=tk.RIGHT, padx=4)
 
     def _add_target(self) -> None:
-        row = simpledialog.askstring("New target", "Label,host,port,email (逗号分隔，端口或邮箱留空均可)", parent=self)
+        row = simpledialog.askstring("新增联系人", "标签,主机,端口,邮箱（逗号分隔，端口或邮箱可留空）", parent=self)
         if not row:
             return
         try:
@@ -322,7 +319,7 @@ class LanTargetsDialog(tk.Toplevel):
             port_int = int(parts[2]) if len(parts) > 2 and parts[2] else None
             email = parts[3] if len(parts) > 3 else ""
         except ValueError:
-            messagebox.showerror("Invalid", "Format: label,host,port,email")
+            messagebox.showerror("格式错误", "请输入：标签,主机,端口,邮箱")
             return
         from .models import LanTarget  # local import to avoid cycle
 
