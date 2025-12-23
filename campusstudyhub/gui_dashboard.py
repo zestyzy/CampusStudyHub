@@ -51,32 +51,44 @@ class DashboardFrame(ctk.CTkFrame):
         self.card_resources = self._card("资源监控", 1, 1)
         self.card_clock = self._card("时间信息", 1, 2)
 
+        self.card_tasks.grid_rowconfigure(1, weight=1)
         self.tasks_box = ctk.CTkTextbox(self.card_tasks, height=180)
-        self.tasks_box.pack(fill="both", expand=True, padx=6, pady=6)
+        self.tasks_box.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
         self.tasks_box.configure(state="disabled")
 
-        self.gpa_label = ctk.CTkLabel(self.card_gpa, text="加载中…", font=("PingFang SC", 16, "bold"))
-        self.gpa_label.pack(anchor="w", padx=6, pady=4)
+        self.card_gpa.grid_rowconfigure(2, weight=1)
+        self.gpa_label = ctk.CTkLabel(
+            self.card_gpa, text="加载中…", font=("PingFang SC", 16, "bold")
+        )
+        self.gpa_label.grid(row=1, column=0, sticky="w", padx=6, pady=(2, 0))
         self.gpa_table = ctk.CTkTextbox(self.card_gpa, height=160)
-        self.gpa_table.pack(fill="both", expand=True, padx=6, pady=6)
+        self.gpa_table.grid(row=2, column=0, sticky="nsew", padx=6, pady=6)
         self.gpa_table.configure(state="disabled")
 
+        self.card_research.grid_rowconfigure(1, weight=1)
         self.research_box = ctk.CTkTextbox(self.card_research, height=200)
-        self.research_box.pack(fill="both", expand=True, padx=6, pady=6)
+        self.research_box.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
         self.research_box.configure(state="disabled")
 
+        self.card_confs.grid_rowconfigure(1, weight=1)
         self.conf_box = ctk.CTkTextbox(self.card_confs, height=200)
-        self.conf_box.pack(fill="both", expand=True, padx=6, pady=6)
+        self.conf_box.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
         self.conf_box.configure(state="disabled")
 
+        self.card_resources.grid_rowconfigure(1, weight=1)
         self.resource_box = ctk.CTkTextbox(self.card_resources, height=200)
-        self.resource_box.pack(fill="both", expand=True, padx=6, pady=6)
+        self.resource_box.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
         self.resource_box.configure(state="disabled")
 
-        self.clock_label = ctk.CTkLabel(self.card_clock, text="", font=("Consolas", 32, "bold"))
-        self.clock_label.pack(pady=12)
-        self.clock_detail = ctk.CTkLabel(self.card_clock, text="", font=("PingFang SC", 14))
-        self.clock_detail.pack()
+        self.card_clock.grid_rowconfigure((1, 2), weight=1)
+        self.clock_label = ctk.CTkLabel(
+            self.card_clock, text="", font=("Consolas", 32, "bold")
+        )
+        self.clock_label.grid(row=1, column=0, pady=(12, 4), sticky="n")
+        self.clock_detail = ctk.CTkLabel(
+            self.card_clock, text="", font=("PingFang SC", 14)
+        )
+        self.clock_detail.grid(row=2, column=0, sticky="n")
         self.after(1000, self._update_clock)
 
     def _card(self, title: str, row: int, column: int) -> ctk.CTkFrame:
