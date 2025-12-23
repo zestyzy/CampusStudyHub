@@ -8,6 +8,13 @@ from typing import Callable, List, Optional
 
 from .config import AppConfig
 from .models import PRIORITY_LEVELS, TASK_STATUSES, Task
+
+# 显示/存储映射，保留存储英文值以兼容已有数据
+PRIORITY_DISPLAY_TO_VALUE = {"低": "low", "中": "medium", "高": "high"}
+PRIORITY_VALUE_TO_DISPLAY = {v: k for k, v in PRIORITY_DISPLAY_TO_VALUE.items()}
+
+STATUS_DISPLAY_TO_VALUE = {"待办": "todo", "进行中": "in_progress", "已完成": "done"}
+STATUS_VALUE_TO_DISPLAY = {v: k for k, v in STATUS_DISPLAY_TO_VALUE.items()}
 from .storage import add_task, delete_task, save_tasks, update_task
 
 
@@ -42,7 +49,9 @@ class TasksFrame(ttk.Frame):
         self.course_filter.grid(row=0, column=1, padx=5)
 
         ttk.Label(filter_frame, text="状态：").grid(row=0, column=2, sticky=tk.W)
-        self.status_filter = ttk.Combobox(filter_frame, values=["全部"] + TASK_STATUSES, state="readonly")
+        self.status_filter = ttk.Combobox(
+            filter_frame, values=["全部"] + list(STATUS_DISPLAY_TO_VALUE.keys()), state="readonly"
+        )
         self.status_filter.set("全部")
         self.status_filter.grid(row=0, column=3, padx=5)
 
@@ -88,10 +97,14 @@ class TasksFrame(ttk.Frame):
         self.course_entry = ttk.Combobox(container, values=self.config.courses, width=37)
         self.type_entry = ttk.Entry(container, width=40)
         self.due_entry = ttk.Entry(container, width=40)
-        self.priority_combo = ttk.Combobox(container, values=PRIORITY_LEVELS, state="readonly", width=37)
-        self.priority_combo.set("medium")
-        self.status_combo = ttk.Combobox(container, values=TASK_STATUSES, state="readonly", width=37)
-        self.status_combo.set("todo")
+        self.priority_combo = ttk.Combobox(
+            container, values=list(PRIORITY_DISPLAY_TO_VALUE.keys()), state="readonly", width=37
+        )
+        self.priority_combo.set(PRIORITY_VALUE_TO_DISPLAY.get("medium", "中"))
+        self.status_combo = ttk.Combobox(
+            container, values=list(STATUS_DISPLAY_TO_VALUE.keys()), state="readonly", width=37
+        )
+        self.status_combo.set(STATUS_VALUE_TO_DISPLAY.get("todo", "待办"))
         self.notes_text = tk.Text(container, width=30, height=5)
 
         widgets = [
@@ -147,12 +160,13 @@ class TasksFrame(ttk.Frame):
 
         course_filter = self.course_filter.get()
         status_filter = self.status_filter.get()
+        status_filter_value = STATUS_DISPLAY_TO_VALUE.get(status_filter, status_filter)
 
         filtered = []
         for task in self.tasks:
             if course_filter not in ("", "全部") and task.course != course_filter:
                 continue
-            if status_filter not in ("", "全部") and task.status != status_filter:
+            if status_filter not in ("", "全部") and task.status != status_filter_value:
                 continue
             if self.overdue_only.get() and not task.is_overdue():
                 continue
@@ -164,7 +178,13 @@ class TasksFrame(ttk.Frame):
                 "",
                 tk.END,
                 iid=task.id,
-                values=(task.title, task.course, task.due_date, task.priority, task.status),
+                values=(
+                    task.title,
+                    task.course,
+                    task.due_date,
+                    PRIORITY_VALUE_TO_DISPLAY.get(task.priority, task.priority),
+                    STATUS_VALUE_TO_DISPLAY.get(task.status, task.status),
+                ),
                 tags=tags,
             )
 
@@ -194,8 +214,8 @@ class TasksFrame(ttk.Frame):
         self.type_entry.insert(0, task.task_type)
         self.due_entry.delete(0, tk.END)
         self.due_entry.insert(0, task.due_date)
-        self.priority_combo.set(task.priority)
-        self.status_combo.set(task.status)
+        self.priority_combo.set(PRIORITY_VALUE_TO_DISPLAY.get(task.priority, task.priority))
+        self.status_combo.set(STATUS_VALUE_TO_DISPLAY.get(task.status, task.status))
         self.notes_text.delete("1.0", tk.END)
         self.notes_text.insert("1.0", task.notes)
 
@@ -205,8 +225,8 @@ class TasksFrame(ttk.Frame):
         self.course_entry.set("")
         self.type_entry.delete(0, tk.END)
         self.due_entry.delete(0, tk.END)
-        self.priority_combo.set("medium")
-        self.status_combo.set("todo")
+        self.priority_combo.set(PRIORITY_VALUE_TO_DISPLAY.get("medium", "中"))
+        self.status_combo.set(STATUS_VALUE_TO_DISPLAY.get("todo", "待办"))
         self.notes_text.delete("1.0", tk.END)
 
     def _save_task(self) -> None:
@@ -214,8 +234,10 @@ class TasksFrame(ttk.Frame):
         course = self.course_entry.get().strip()
         task_type = self.type_entry.get().strip()
         due_date_str = self.due_entry.get().strip()
-        priority = self.priority_combo.get()
-        status = self.status_combo.get()
+        priority_display = self.priority_combo.get()
+        status_display = self.status_combo.get()
+        priority = PRIORITY_DISPLAY_TO_VALUE.get(priority_display, priority_display)
+        status = STATUS_DISPLAY_TO_VALUE.get(status_display, status_display)
         notes = self.notes_text.get("1.0", tk.END).strip()
 
         if not title or not course or not task_type or not due_date_str:

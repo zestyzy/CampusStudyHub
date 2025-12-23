@@ -71,12 +71,12 @@ class BibtexGenerator(tk.Frame):
 
         authors = [a.strip() for a in self.authors_var.get().split(",") if a.strip()]
         year = self.year_var.get().strip() or "2024"
-        venue = self.venue_var.get().strip() or "Unknown Venue"
+        venue = self.venue_var.get().strip() or "未知出版物"
         key = self._build_key(title=title, doi=doi, year=year)
 
         entry: Dict[str, str] = {
-            "title": title or "Untitled",
-            "author": " and ".join(authors) if authors else "Anon",
+            "title": title or "未命名条目",
+            "author": " and ".join(authors) if authors else "佚名",
             "year": year,
             "journal": venue,
         }

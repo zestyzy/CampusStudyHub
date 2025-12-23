@@ -61,15 +61,15 @@ class DashboardFrame(ctk.CTkFrame):
         header = ctk.CTkFrame(self, fg_color=BG_DARK)
         header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=0, minsize=120)
+        header.grid_columnconfigure(1, weight=0, minsize=150)
         ctk.CTkLabel(header, text="研究与学习总览", font=HEADER_FONT, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=6, pady=6
         )
         ctk.CTkButton(
             header,
             text="刷新",
-            width=130,
-            height=34,
+            width=150,
+            height=36,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
             font=BADGE_FONT,
@@ -186,15 +186,15 @@ class DashboardFrame(ctk.CTkFrame):
         title_row = ctk.CTkFrame(frame, fg_color="transparent")
         title_row.grid(row=0, column=0, sticky="ew", padx=CARD_PAD_X, pady=(CARD_PAD_Y, 6))
         title_row.grid_columnconfigure(0, weight=1)
-        title_row.grid_columnconfigure(1, weight=0, minsize=96)
+        title_row.grid_columnconfigure(1, weight=0, minsize=150)
         ctk.CTkLabel(title_row, text=title, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w"
         )
         ctk.CTkButton(
             title_row,
             text="打开",
-            width=110,
-            height=32,
+            width=140,
+            height=34,
             command=lambda key=nav_key: self._navigate(key),
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
@@ -226,13 +226,20 @@ class DashboardFrame(ctk.CTkFrame):
         upcoming: List[str] = []
         overdue: List[str] = []
         in_week = 0
+        status_map = {"todo": "待办", "in_progress": "进行中", "done": "已完成"}
+        priority_map = {"low": "低", "medium": "中", "high": "高"}
         for task in sorted(self.tasks, key=lambda t: t.due_date):
             try:
                 due = date.fromisoformat(task.due_date)
             except ValueError:
                 continue
             days = (due - now).days
-            line = f"[{task.status}] {task.title} / {task.course}  截止: {task.due_date} ({days:+d} 天)"
+            status_text = status_map.get(task.status, task.status)
+            priority_text = priority_map.get(task.priority, task.priority)
+            line = (
+                f"[{status_text}|优先级:{priority_text}] {task.title} / {task.course}  "
+                f"截止: {task.due_date} ({days:+d} 天)"
+            )
             if days < 0:
                 overdue.append(line)
             elif days <= 7:
@@ -250,7 +257,12 @@ class DashboardFrame(ctk.CTkFrame):
         if papers:
             lines.append("【阅读】")
             for paper in papers[:6]:
-                tag = f"[{paper.status}]" if paper.status else ""
+                tag_map = {
+                    "to_read": "待阅读",
+                    "reading": "阅读中",
+                    "done": "已完成",
+                }
+                tag = f"[{tag_map.get(paper.status, paper.status)}]" if paper.status else ""
                 lines.append(f"- {paper.title} {tag} {paper.doi or ''}")
             if len(papers) > 6:
                 lines.append(f"... 共 {len(papers)} 篇文献")
@@ -283,9 +295,17 @@ class DashboardFrame(ctk.CTkFrame):
         if monitors:
             lines.append(f"正在监控: {len(monitors)} 个日志")
         if self.experiments:
+            status_map = {
+                "planned": "计划中",
+                "running": "运行中",
+                "done": "完成",
+                "failed": "失败",
+            }
             for exp in self.experiments[:4]:
                 tail = exp.last_message or exp.metric or ""
-                lines.append(f"[{exp.status}] {exp.title} - {exp.project}  {tail}")
+                lines.append(
+                    f"[{status_map.get(exp.status, exp.status)}] {exp.title} - {exp.project}  {tail}"
+                )
             if len(self.experiments) > 4:
                 lines.append(f"... 共 {len(self.experiments)} 条实验")
         elif not monitors:
@@ -355,6 +375,17 @@ class DashboardFrame(ctk.CTkFrame):
 
     def _update_clock(self) -> None:
         now = datetime.now()
+        weekday_map = {
+            0: "星期一",
+            1: "星期二",
+            2: "星期三",
+            3: "星期四",
+            4: "星期五",
+            5: "星期六",
+            6: "星期日",
+        }
         self.clock_label.configure(text=now.strftime("%H:%M:%S"))
-        self.clock_detail.configure(text=now.strftime("%Y-%m-%d %A"))
+        self.clock_detail.configure(
+            text=f"{now.strftime('%Y-%m-%d')} {weekday_map.get(now.weekday(), '')}"
+        )
         self.after(1000, self._update_clock)

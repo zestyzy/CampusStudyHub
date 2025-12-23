@@ -35,19 +35,19 @@ class FigureComposer(tk.Frame):
         for i in range(4):
             grid_frame.columnconfigure(i, weight=1)
 
-        tk.Label(grid_frame, text="行 (Rows)").grid(row=0, column=0, sticky="w")
+        tk.Label(grid_frame, text="行数").grid(row=0, column=0, sticky="w")
         self.rows_var = tk.IntVar(value=2)
         tk.Entry(grid_frame, textvariable=self.rows_var, width=6).grid(
             row=0, column=1, sticky="w"
         )
 
-        tk.Label(grid_frame, text="列 (Cols)").grid(row=0, column=2, sticky="w")
+        tk.Label(grid_frame, text="列数").grid(row=0, column=2, sticky="w")
         self.cols_var = tk.IntVar(value=2)
         tk.Entry(grid_frame, textvariable=self.cols_var, width=6).grid(
             row=0, column=3, sticky="w"
         )
 
-        tk.Label(grid_frame, text="内边距 / Padding (px)").grid(row=1, column=0, sticky="w")
+        tk.Label(grid_frame, text="内边距（像素）").grid(row=1, column=0, sticky="w")
         self.padding_var = tk.IntVar(value=20)
         tk.Entry(grid_frame, textvariable=self.padding_var, width=6).grid(
             row=1, column=1, sticky="w"
@@ -84,7 +84,7 @@ class FigureComposer(tk.Frame):
     def select_files(self) -> None:
         """Allow user to pick multiple image files."""
         paths = filedialog.askopenfilenames(
-            title="选择图片", filetypes=[("Images", "*.png *.jpg *.jpeg")]
+            title="选择图片", filetypes=[("图片文件", "*.png *.jpg *.jpeg")]
         )
         if not paths:
             return
