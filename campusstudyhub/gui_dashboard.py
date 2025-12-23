@@ -192,8 +192,6 @@ class DashboardFrame(ctk.CTkFrame):
         texts: List[str] = []
         # CPU load (basic近似)
         if hasattr(os, "getloadavg"):
-            import os  # local import to avoid issues on Windows
-
             try:
                 load1, load5, load15 = os.getloadavg()
                 texts.append(f"CPU 负载: {load1:.2f} / {load5:.2f} / {load15:.2f}")
