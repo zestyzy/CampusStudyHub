@@ -1,0 +1,42 @@
+[
+  {
+    "name": "AAAI",
+    "category": "CCF-A",
+    "submission_deadline": "2025-08-15",
+    "location": "North America",
+    "url": "https://aaai.org",
+    "note": "AI flagship"
+  },
+  {
+    "name": "CVPR",
+    "category": "CCF-A",
+    "submission_deadline": "2025-11-15",
+    "location": "International",
+    "url": "https://cvpr.thecvf.com",
+    "note": "Computer vision"
+  },
+  {
+    "name": "ICML",
+    "category": "CCF-A",
+    "submission_deadline": "2025-01-20",
+    "location": "International",
+    "url": "https://icml.cc",
+    "note": "Machine learning"
+  },
+  {
+    "name": "SIGIR",
+    "category": "CCF-A",
+    "submission_deadline": "2025-02-01",
+    "location": "International",
+    "url": "https://sigir.org",
+    "note": "Information retrieval"
+  },
+  {
+    "name": "IJCAI",
+    "category": "CCF-A",
+    "submission_deadline": "2025-01-10",
+    "location": "International",
+    "url": "https://ijcai.org",
+    "note": "AI conference"
+  }
+]
