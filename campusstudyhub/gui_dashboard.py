@@ -61,20 +61,20 @@ class DashboardFrame(ctk.CTkFrame):
         header = ctk.CTkFrame(self, fg_color=BG_DARK)
         header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=0, minsize=150)
+        header.grid_columnconfigure(1, weight=0, minsize=190)
         ctk.CTkLabel(header, text="研究与学习总览", font=HEADER_FONT, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=6, pady=6
         )
         ctk.CTkButton(
             header,
             text="刷新",
-            width=150,
-            height=36,
+            width=170,
+            height=38,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
             font=BADGE_FONT,
             command=self.refresh,
-        ).grid(row=0, column=1, padx=6, pady=6)
+        ).grid(row=0, column=1, padx=8, pady=6, sticky="e")
 
         # 第一行：任务、科研记录、会议
         self.card_tasks = self._card("任务清单", 1, 0, "tasks")
@@ -181,26 +181,26 @@ class DashboardFrame(ctk.CTkFrame):
     def _card(self, title: str, row: int, column: int, nav_key: str) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(self, **card_kwargs())
         frame.grid(row=row, column=column, padx=12, pady=8, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1, minsize=220)
 
         title_row = ctk.CTkFrame(frame, fg_color="transparent")
         title_row.grid(row=0, column=0, sticky="ew", padx=CARD_PAD_X, pady=(CARD_PAD_Y, 6))
         title_row.grid_columnconfigure(0, weight=1)
-        title_row.grid_columnconfigure(1, weight=0, minsize=150)
+        title_row.grid_columnconfigure(1, weight=0, minsize=180)
         ctk.CTkLabel(title_row, text=title, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w"
         )
         ctk.CTkButton(
             title_row,
             text="打开",
-            width=140,
-            height=34,
+            width=160,
+            height=36,
             command=lambda key=nav_key: self._navigate(key),
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
             font=BADGE_FONT,
-            corner_radius=10,
-        ).grid(row=0, column=1, sticky="e")
+            corner_radius=12,
+        ).grid(row=0, column=1, sticky="e", padx=4)
 
         # Placeholder content row will be added by caller
         return frame
