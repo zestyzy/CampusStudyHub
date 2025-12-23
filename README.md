@@ -4,6 +4,7 @@ CampusStudyHub is a lightweight, local CustomTkinter application that helps comp
 
 ## Features
 
+- **总览仪表盘（Overview）:** 一屏卡片式总览任务、GPA 摘要、科研/会议/资源概况并可一键刷新。
 - **Task management & reminders:** add/edit/delete tasks with overdue highlighting and upcoming deadline views.
 - **File organization & stats:** scan/move study files into `Course/Semester/Type/` and export indexes; see course/status counts.
 - **学校事项（School）:** GPA 计算器（必修/选修区分，专业 GPA 和总体 GPA）。
@@ -74,7 +75,8 @@ campusstudyhub/
 ├─ models.py            # Dataclasses for tasks, conferences, GPA rows, file index entries, research notes
 ├─ storage.py           # Load/save helpers for tasks, conferences, files, grades, research data
 ├─ lan.py               # UDP-based LAN notification helper
-├─ gui_main.py          # CustomTkinter window and tab wiring（学校事项/科研辅助/其他）
+├─ gui_main.py          # CustomTkinter window and tab wiring（总览/学校事项/科研辅助/其他）
+├─ gui_dashboard.py     # 卡片式总览（任务/GPA/科研/会议/资源/时间）
 ├─ gui_pomodoro.py      # 番茄钟（进度条、沉浸静音、北京时间、自定义时长）
 ├─ gui_lan.py           # CCF 会议通知 + 实验日志监控（分离功能）
 ├─ gui_monitor.py       # 资源监控（gpustat/top/df -h 输出聚合）

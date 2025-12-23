@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from .gui_dashboard import DashboardFrame
 from .gui_lan import ConferenceLANFrame, ExperimentMonitorFrame, PeerManager
 from .gui_monitor import ResourceMonitorFrame
 from .gui_pomodoro import PomodoroFrame
@@ -21,9 +22,12 @@ def launch_app() -> None:
     tabview = ctk.CTkTabview(app)
     tabview.pack(fill="both", expand=True, padx=12, pady=12)
 
+    overview_tab = tabview.add("总览")
     school_tab = tabview.add("学校事项")
     research_tab = tabview.add("科研辅助")
     other_tab = tabview.add("其他")
+
+    DashboardFrame(overview_tab).pack(fill="both", expand=True, padx=10, pady=10)
 
     # 学校事项：GPA 计算
     school_inner = ctk.CTkTabview(school_tab)
