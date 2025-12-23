@@ -61,15 +61,15 @@ class DashboardFrame(ctk.CTkFrame):
         header = ctk.CTkFrame(self, fg_color=BG_DARK)
         header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=0, minsize=190)
+        header.grid_columnconfigure(1, weight=0, minsize=150)
         ctk.CTkLabel(header, text="研究与学习总览", font=HEADER_FONT, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=6, pady=6
         )
         ctk.CTkButton(
             header,
             text="刷新",
-            width=170,
-            height=38,
+            width=130,
+            height=36,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
             font=BADGE_FONT,
@@ -186,15 +186,15 @@ class DashboardFrame(ctk.CTkFrame):
         title_row = ctk.CTkFrame(frame, fg_color="transparent")
         title_row.grid(row=0, column=0, sticky="ew", padx=CARD_PAD_X, pady=(CARD_PAD_Y, 6))
         title_row.grid_columnconfigure(0, weight=1)
-        title_row.grid_columnconfigure(1, weight=0, minsize=180)
+        title_row.grid_columnconfigure(1, weight=0, minsize=140)
         ctk.CTkLabel(title_row, text=title, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w"
         )
         ctk.CTkButton(
             title_row,
             text="打开",
-            width=160,
-            height=36,
+            width=118,
+            height=34,
             command=lambda key=nav_key: self._navigate(key),
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
