@@ -50,6 +50,7 @@ class ConferencesFrame(ttk.Frame):
 
         ttk.Button(controls, text="应用筛选", command=self.refresh_list).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls, text="发送提醒", command=self._send_lan).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls, text="选择会议发送", command=self._pick_and_send).pack(side=tk.LEFT, padx=5)
 
         main = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         main.pack(fill=tk.BOTH, expand=True)
@@ -268,7 +269,21 @@ class ConferencesFrame(ttk.Frame):
             messagebox.showinfo("暂无可发送的会议", "请选择会议或扩大截止天数范围后再试。")
             return
 
-        lines = [f"{c.name} ({c.category}) 截止 {c.submission_deadline}" for c in due_items]
+        self._dispatch_notifications(due_items)
+
+    def _pick_and_send(self) -> None:
+        dialog = ConferencePickDialog(self, self.conferences)
+        self.wait_window(dialog)
+        if not dialog.result:
+            return
+        self._dispatch_notifications(dialog.result)
+
+    def _dispatch_notifications(self, conferences: List[ConferenceEvent]) -> None:
+        if not conferences:
+            messagebox.showinfo("暂无可发送的会议", "请至少选择一条会议记录。")
+            return
+
+        lines = [f"{c.name} ({c.category}) 截止 {c.submission_deadline}" for c in conferences]
         message = "CampusStudyHub 会议提醒\n" + "\n".join(lines)
         results = send_lan_notifications(
             message,
@@ -350,4 +365,40 @@ class LanTargetsDialog(tk.Toplevel):
 
     def _save(self) -> None:
         self.result = self.targets
+        self.destroy()
+
+
+class ConferencePickDialog(tk.Toplevel):
+    """选择会议以发送提醒的对话框。"""
+
+    def __init__(self, master: tk.Widget, conferences: List[ConferenceEvent]) -> None:
+        super().__init__(master)
+        self.title("选择会议")
+        self.result: Optional[List[ConferenceEvent]] = None
+        self.conferences = conferences
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        self.resizable(False, False)
+        frame = ttk.Frame(self, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text="请选择要发送提醒的会议（可多选）：").pack(anchor=tk.W, pady=(0, 6))
+        self.listbox = tk.Listbox(frame, selectmode=tk.MULTIPLE, width=48, height=10)
+        for conf in self.conferences:
+            text = f"{conf.name} | {conf.category} | 截止 {conf.submission_deadline}"
+            self.listbox.insert(tk.END, text)
+        self.listbox.pack(fill=tk.BOTH, expand=True)
+
+        btns = ttk.Frame(frame)
+        btns.pack(fill=tk.X, pady=8)
+        ttk.Button(btns, text="取消", command=self.destroy).pack(side=tk.RIGHT, padx=4)
+        ttk.Button(btns, text="发送", command=self._confirm).pack(side=tk.RIGHT, padx=4)
+
+    def _confirm(self) -> None:
+        selection = self.listbox.curselection()
+        if not selection:
+            messagebox.showinfo("未选择", "请先选择需要提醒的会议。")
+            return
+        self.result = [self.conferences[i] for i in selection]
         self.destroy()
