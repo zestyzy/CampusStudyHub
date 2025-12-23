@@ -60,16 +60,16 @@ class DashboardFrame(ctk.CTkFrame):
 
         header = ctk.CTkFrame(self, fg_color=BG_DARK)
         header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
-        header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=0, minsize=150)
+        header.grid_columnconfigure(0, weight=1, minsize=200)
+        header.grid_columnconfigure(1, weight=0, minsize=120)
         ctk.CTkLabel(header, text="研究与学习总览", font=HEADER_FONT, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=6, pady=6
         )
         ctk.CTkButton(
             header,
             text="刷新",
-            width=130,
-            height=36,
+            width=110,
+            height=34,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
             font=BADGE_FONT,
@@ -77,14 +77,14 @@ class DashboardFrame(ctk.CTkFrame):
         ).grid(row=0, column=1, padx=8, pady=6, sticky="e")
 
         # 第一行：任务、科研记录、会议
-        self.card_tasks = self._card("任务清单", 1, 0, "tasks")
-        self.card_research = self._card("科研记录", 1, 1, "research")
-        self.card_confs = self._card("近期会议", 1, 2, "conferences")
+        self.card_tasks = self._make_card("任务清单", 1, 0, "tasks", columns=1)
+        self.card_research = self._make_card("科研记录", 1, 1, "research", columns=1)
+        self.card_confs = self._make_card("近期会议", 1, 2, "conferences", columns=1)
 
         # 第二行：实验日志、资源与时钟
-        self.card_exps = self._card("实验日志", 2, 0, "experiments")
-        self.card_resources = self._card("资源监控", 2, 1, "monitor")
-        self.card_clock = self._card("时间信息", 2, 2, "clock")
+        self.card_exps = self._make_card("实验日志", 2, 0, "experiments", columns=1)
+        self.card_resources = self._make_card("资源监控", 2, 1, "monitor", columns=3)
+        self.card_clock = self._make_card("时间信息", 2, 2, "clock", columns=1)
 
         # 任务卡片
         self.card_tasks.grid_rowconfigure(2, weight=1)
@@ -178,29 +178,31 @@ class DashboardFrame(ctk.CTkFrame):
         self.clock_detail.grid(row=2, column=0, sticky="n")
         self.after(1000, self._update_clock)
 
-    def _card(self, title: str, row: int, column: int, nav_key: str) -> ctk.CTkFrame:
+    def _make_card(self, title: str, row: int, column: int, nav_key: str, columns: int = 1) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(self, **card_kwargs())
         frame.grid(row=row, column=column, padx=12, pady=8, sticky="nsew")
-        frame.grid_columnconfigure(0, weight=1, minsize=220)
+        for col in range(columns):
+            frame.grid_columnconfigure(col, weight=1, minsize=180)
+        frame.grid_rowconfigure(0, weight=0, minsize=48)
 
         title_row = ctk.CTkFrame(frame, fg_color="transparent")
-        title_row.grid(row=0, column=0, sticky="ew", padx=CARD_PAD_X, pady=(CARD_PAD_Y, 6))
+        title_row.grid(row=0, column=0, columnspan=columns, sticky="ew", padx=CARD_PAD_X, pady=(CARD_PAD_Y, 6))
         title_row.grid_columnconfigure(0, weight=1)
-        title_row.grid_columnconfigure(1, weight=0, minsize=140)
+        title_row.grid_columnconfigure(1, weight=0, minsize=96)
         ctk.CTkLabel(title_row, text=title, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w"
         )
         ctk.CTkButton(
             title_row,
             text="打开",
-            width=118,
-            height=34,
+            width=88,
+            height=32,
             command=lambda key=nav_key: self._navigate(key),
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
             font=BADGE_FONT,
             corner_radius=12,
-        ).grid(row=0, column=1, sticky="e", padx=4)
+        ).grid(row=0, column=1, sticky="e", padx=6)
 
         # Placeholder content row will be added by caller
         return frame
