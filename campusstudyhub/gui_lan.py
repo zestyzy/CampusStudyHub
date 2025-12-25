@@ -614,6 +614,61 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
             return
         self._notify_peers("; ".join(summary))
 
+    def _dispatch(self, peers: List[Dict[str, str]], message: str) -> Dict[str, int]:
+        if any(peer.get("email") for peer in peers) and not self.config.smtp_sender:
+            messagebox.showinfo("提示", "请先在“邮件设置”中填写发件邮箱")
+            return {"ok": 0, "fail": len(peers)}
+        targets = []
+        for peer in peers:
+            targets.append(
+                LanTarget(
+                    label=peer.get("name", "peer"),
+                    host=peer.get("ip", "127.0.0.1"),
+                    port=int(peer.get("port")) if peer.get("port") else None,
+                    email=peer.get("email", ""),
+                )
+            )
+        results = send_lan_notifications(
+            message,
+            targets,
+            smtp_host=self.config.smtp_host,
+            smtp_port=self.config.smtp_port,
+            smtp_sender=self.config.smtp_sender,
+            smtp_username=self.config.smtp_username,
+            smtp_password=self.config.smtp_password,
+            smtp_use_tls=self.config.smtp_use_tls,
+        )
+        ok = len([r for r in results if r[1]])
+        fail = len(results) - ok
+        return {"ok": ok, "fail": fail}
+
+    def _open_email_settings(self) -> None:
+        EmailSettingsDialog(self, self.config, self._save_email_settings)
+
+    def _save_email_settings(self, config: AppConfig) -> None:
+        self.config = config
+        from .config import save_config
+
+        save_config(config)
+
+    def _export_metrics(self) -> None:
+        if not self.metrics:
+            messagebox.showinfo("提示", "暂无可导出的指标")
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["monitor_id", "ts", "key", "value"])
+            for mid, rows in self.metrics.items():
+                for row in rows:
+                    for key, val in row.items():
+                        if key == "ts":
+                            continue
+                        writer.writerow([mid, datetime.fromtimestamp(row.get("ts", 0)).isoformat(), key, val])
+        messagebox.showinfo("完成", "已导出 CSV")
+
     def _remove_monitor(self, monitor: LogMonitorConfig) -> None:
         self._stop_monitor(monitor)
         self.monitors = [m for m in self.monitors if m.id != monitor.id]
@@ -712,75 +767,6 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         msg = f"【实验监控】{message}"
         results = self._dispatch(selected, msg)
         self._append_log(f"提醒发送：成功 {results['ok']} 失败 {results['fail']}")
-
-
-def _read_tail_lines(path: Path, limit: int, max_bytes: int = 200_000) -> str:
-    """从文件尾部读取最近的若干行，避免全量读取超大日志。"""
-
-    if limit <= 0 or not path.exists():
-        return ""
-    with path.open("rb") as f:
-        f.seek(0, 2)
-        size = f.tell()
-        f.seek(max(size - max_bytes, 0))
-        chunk = f.read().decode("utf-8", errors="ignore")
-    lines = chunk.splitlines()
-    return "\n".join(lines[-limit:])
-
-    def _dispatch(self, peers: List[Dict[str, str]], message: str) -> Dict[str, int]:
-        if any(peer.get("email") for peer in peers) and not self.config.smtp_sender:
-            messagebox.showinfo("提示", "请先在“邮件设置”中填写发件邮箱")
-            return {"ok": 0, "fail": len(peers)}
-        targets = []
-        for peer in peers:
-            targets.append(
-                LanTarget(
-                    label=peer.get("name", "peer"),
-                    host=peer.get("ip", "127.0.0.1"),
-                    port=int(peer.get("port")) if peer.get("port") else None,
-                    email=peer.get("email", ""),
-                )
-            )
-        results = send_lan_notifications(
-            message,
-            targets,
-            smtp_host=self.config.smtp_host,
-            smtp_port=self.config.smtp_port,
-            smtp_sender=self.config.smtp_sender,
-            smtp_username=self.config.smtp_username,
-            smtp_password=self.config.smtp_password,
-            smtp_use_tls=self.config.smtp_use_tls,
-        )
-        ok = len([r for r in results if r[1]])
-        fail = len(results) - ok
-        return {"ok": ok, "fail": fail}
-
-    def _open_email_settings(self) -> None:
-        EmailSettingsDialog(self, self.config, self._save_email_settings)
-
-    def _save_email_settings(self, config: AppConfig) -> None:
-        self.config = config
-        from .config import save_config
-
-        save_config(config)
-
-    def _export_metrics(self) -> None:
-        if not self.metrics:
-            messagebox.showinfo("提示", "暂无可导出的指标")
-            return
-        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")])
-        if not path:
-            return
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["monitor_id", "ts", "key", "value"])
-            for mid, rows in self.metrics.items():
-                for row in rows:
-                    for key, val in row.items():
-                        if key == "ts":
-                            continue
-                        writer.writerow([mid, datetime.fromtimestamp(row.get("ts", 0)).isoformat(), key, val])
-        messagebox.showinfo("完成", "已导出 CSV")
 
 
 def _read_tail_lines(path: Path, limit: int, max_bytes: int = 200_000) -> str:
