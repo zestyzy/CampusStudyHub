@@ -5,7 +5,11 @@
     "submission_deadline": "2025-08-15",
     "location": "North America",
     "url": "https://aaai.org",
-    "note": "AI flagship"
+    "note": "AI flagship",
+    "starred": true,
+    "remind_before_days": 7,
+    "source": "local",
+    "id": "f720e1c1-5d2c-40b4-950e-4cefbfb8cc68"
   },
   {
     "name": "CVPR",
@@ -13,7 +17,11 @@
     "submission_deadline": "2025-11-15",
     "location": "International",
     "url": "https://cvpr.thecvf.com",
-    "note": "Computer vision"
+    "note": "Computer vision",
+    "starred": false,
+    "remind_before_days": 7,
+    "source": "local",
+    "id": "cf41f253-d325-449d-9557-4a67b4c91d69"
   },
   {
     "name": "ICML",
@@ -21,7 +29,11 @@
     "submission_deadline": "2025-01-20",
     "location": "International",
     "url": "https://icml.cc",
-    "note": "Machine learning"
+    "note": "Machine learning",
+    "starred": false,
+    "remind_before_days": 7,
+    "source": "local",
+    "id": "84458844-61f5-4cf9-b113-7e2a0d4ed69c"
   },
   {
     "name": "SIGIR",
@@ -29,7 +41,11 @@
     "submission_deadline": "2025-02-01",
     "location": "International",
     "url": "https://sigir.org",
-    "note": "Information retrieval"
+    "note": "Information retrieval",
+    "starred": false,
+    "remind_before_days": 7,
+    "source": "local",
+    "id": "c97af3af-836a-40c6-a54a-77d24d421c23"
   },
   {
     "name": "IJCAI",
@@ -37,6 +53,10 @@
     "submission_deadline": "2025-01-10",
     "location": "International",
     "url": "https://ijcai.org",
-    "note": "AI conference"
+    "note": "AI conference",
+    "starred": false,
+    "remind_before_days": 7,
+    "source": "local",
+    "id": "255cc516-4691-4fad-affd-1b6187e82c81"
   }
 ]
