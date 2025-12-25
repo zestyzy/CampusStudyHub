@@ -6,6 +6,7 @@ import json
 import threading
 import time
 import urllib.request
+from collections import deque
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -16,12 +17,8 @@ import customtkinter as ctk
 from .config import AppConfig, load_config
 from .lan import send_lan_notifications
 from .models import ConferenceEvent, LanTarget, LogMonitorConfig
-from .storage import (
-    load_conferences,
-    load_log_monitors,
-    save_conferences,
-    save_log_monitors,
-)
+from .storage import load_conferences, load_log_monitors, save_conferences, save_log_monitors
+from .ui_style import BG_CARD, BG_DARK, HEADER_FONT, LABEL_BOLD, TEXT_PRIMARY, card_kwargs
 
 DATA_DIR = Path("data")
 CONFERENCES_FILE = DATA_DIR / "conferences.json"
@@ -163,6 +160,7 @@ class ConferenceLANFrame(ctk.CTkFrame):
 
     def __init__(self, master: ctk.CTkBaseClass, manager: PeerManager | None = None) -> None:
         super().__init__(master)
+        self.configure(fg_color=BG_DARK)
         self.manager = manager or PeerManager()
         self.config: AppConfig = load_config()
         self.conferences: List[ConferenceEvent] = load_conferences()
@@ -175,14 +173,16 @@ class ConferenceLANFrame(ctk.CTkFrame):
 
     def _build_ui(self) -> None:
         self.grid_columnconfigure((0, 1), weight=1)
-        title = ctk.CTkLabel(self, text="会议通知", font=("PingFang SC", 24, "bold"))
+        title = ctk.CTkLabel(self, text="会议通知中心", font=HEADER_FONT, text_color=TEXT_PRIMARY)
         title.grid(row=0, column=0, columnspan=2, pady=6)
 
         # 左：联系人与动作
-        peer_box = ctk.CTkFrame(self, corner_radius=12)
+        peer_box = ctk.CTkFrame(self, **card_kwargs())
         peer_box.grid(row=1, column=0, padx=10, pady=6, sticky="nsew")
         peer_box.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(peer_box, text="通知对象", font=("PingFang SC", 16, "bold")).grid(row=0, column=0, pady=4)
+        ctk.CTkLabel(peer_box, text="通知对象", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, pady=4
+        )
         self.peer_list = PeerChecklist(peer_box, self.manager)
         self.peer_list.grid(row=1, column=0, padx=8, pady=4, sticky="nsew")
         action_row = ctk.CTkFrame(peer_box)
@@ -208,10 +208,12 @@ class ConferenceLANFrame(ctk.CTkFrame):
         self.peer_email.grid(row=0, column=3, padx=4)
 
         # 右：会议列表
-        conf_box = ctk.CTkFrame(self, corner_radius=12)
+        conf_box = ctk.CTkFrame(self, **card_kwargs())
         conf_box.grid(row=1, column=1, padx=10, pady=6, sticky="nsew")
         conf_box.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(conf_box, text="会议列表", font=("PingFang SC", 16, "bold")).grid(row=0, column=0, pady=4)
+        ctk.CTkLabel(conf_box, text="会议列表", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, pady=4
+        )
 
         filter_row = ctk.CTkFrame(conf_box)
         filter_row.grid(row=1, column=0, pady=4, sticky="ew")
@@ -225,7 +227,9 @@ class ConferenceLANFrame(ctk.CTkFrame):
         source_row.grid(row=2, column=0, pady=4, sticky="ew")
         source_row.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(source_row, text="数据来源").grid(row=0, column=0, padx=4)
-        self.source_button = ctk.CTkSegmentedButton(source_row, values=["本地", "网络"], variable=self.source_mode, command=self._refresh_lists)
+        self.source_button = ctk.CTkSegmentedButton(
+            source_row, values=["本地", "网络"], variable=self.source_mode, command=self._refresh_lists
+        )
         self.source_button.grid(row=0, column=1, padx=4, sticky="w")
         ctk.CTkLabel(source_row, text="刷新(分钟)").grid(row=0, column=2, padx=4)
         self.refresh_entry = ctk.CTkEntry(source_row, textvariable=self.refresh_minutes, width=80)
@@ -475,12 +479,17 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
 
     def _build_ui(self) -> None:
         self.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkLabel(self, text="实验监控", font=("PingFang SC", 24, "bold")).grid(row=0, column=0, columnspan=2, pady=6)
+        self.configure(fg_color=BG_DARK)
+        ctk.CTkLabel(self, text="实验监控", font=HEADER_FONT, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, columnspan=2, pady=6
+        )
 
-        peer_box = ctk.CTkFrame(self, corner_radius=12)
+        peer_box = ctk.CTkFrame(self, **card_kwargs())
         peer_box.grid(row=1, column=0, padx=10, pady=6, sticky="nsew")
         peer_box.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(peer_box, text="通知对象", font=("PingFang SC", 16, "bold")).grid(row=0, column=0, pady=4)
+        ctk.CTkLabel(peer_box, text="通知对象", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, pady=4
+        )
         self.peer_list = PeerChecklist(peer_box, self.manager)
         self.peer_list.grid(row=1, column=0, padx=8, pady=4, sticky="nsew")
         ctk.CTkButton(peer_box, text="全选", command=self.peer_list.select_all, width=100).grid(row=2, column=0, pady=4)
@@ -489,10 +498,12 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
             row=4, column=0, pady=4
         )
 
-        config_box = ctk.CTkFrame(self, corner_radius=12)
+        config_box = ctk.CTkFrame(self, **card_kwargs())
         config_box.grid(row=1, column=1, padx=10, pady=6, sticky="nsew")
         config_box.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(config_box, text="新增监控", font=("PingFang SC", 16, "bold")).grid(row=0, column=0, columnspan=3, pady=4)
+        ctk.CTkLabel(config_box, text="新增监控", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, columnspan=3, pady=4
+        )
         self.log_path_entry = ctk.CTkEntry(config_box, placeholder_text="日志路径")
         self.log_path_entry.grid(row=1, column=0, columnspan=2, padx=4, pady=2, sticky="ew")
         ctk.CTkButton(config_box, text="选择", width=80, command=self._choose_log).grid(row=1, column=2, padx=4)
@@ -514,18 +525,22 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self.tail_entry.grid(row=5, column=1, padx=4, sticky="w")
         ctk.CTkButton(config_box, text="添加监控", command=self._add_monitor).grid(row=6, column=0, columnspan=3, pady=6)
 
-        table_box = ctk.CTkFrame(self, corner_radius=12)
+        table_box = ctk.CTkFrame(self, **card_kwargs())
         table_box.grid(row=2, column=0, columnspan=2, padx=10, pady=6, sticky="nsew")
         table_box.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(table_box, text="监控列表", font=("PingFang SC", 16, "bold")).grid(row=0, column=0, pady=4)
+        ctk.CTkLabel(table_box, text="监控列表", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, pady=4
+        )
         self.table = ctk.CTkScrollableFrame(table_box, height=260)
         self.table.grid(row=1, column=0, sticky="nsew", padx=6, pady=4)
 
-        bottom = ctk.CTkFrame(self, corner_radius=12)
+        bottom = ctk.CTkFrame(self, **card_kwargs())
         bottom.grid(row=3, column=0, columnspan=2, padx=10, pady=6, sticky="nsew")
         bottom.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(bottom, text="尾部快照 / 日志", font=("PingFang SC", 16, "bold")).grid(row=0, column=0, pady=4)
-        self.log_view = ctk.CTkTextbox(bottom, height=200)
+        ctk.CTkLabel(bottom, text="尾部快照 / 日志", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, pady=4
+        )
+        self.log_view = ctk.CTkTextbox(bottom, height=200, fg_color=BG_CARD)
         self.log_view.grid(row=1, column=0, sticky="nsew", padx=6, pady=4)
         btn_row = ctk.CTkFrame(bottom)
         btn_row.grid(row=2, column=0, pady=4)
@@ -579,7 +594,73 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self._render_table()
         self._start_monitor(monitor)
 
+    def _manual_notify(self) -> None:
+        summary = []
+        for mon in self.monitors:
+            tail = (self.latest_tail.get(mon.id, "").splitlines() or ["无更新"])[-1]
+            summary.append(f"{Path(mon.path).name}: {tail}")
+        if not summary:
+            messagebox.showinfo("提示", "暂无监控数据")
+            return
+        self._notify_peers("; ".join(summary))
+
+    def _dispatch(self, peers: List[Dict[str, str]], message: str) -> Dict[str, int]:
+        if any(peer.get("email") for peer in peers) and not self.config.smtp_sender:
+            messagebox.showinfo("提示", "请先在“邮件设置”中填写发件邮箱")
+            return {"ok": 0, "fail": len(peers)}
+        targets = []
+        for peer in peers:
+            targets.append(
+                LanTarget(
+                    label=peer.get("name", "peer"),
+                    host=peer.get("ip", "127.0.0.1"),
+                    port=int(peer.get("port")) if peer.get("port") else None,
+                    email=peer.get("email", ""),
+                )
+            )
+        results = send_lan_notifications(
+            message,
+            targets,
+            smtp_host=self.config.smtp_host,
+            smtp_port=self.config.smtp_port,
+            smtp_sender=self.config.smtp_sender,
+            smtp_username=self.config.smtp_username,
+            smtp_password=self.config.smtp_password,
+            smtp_use_tls=self.config.smtp_use_tls,
+        )
+        ok = len([r for r in results if r[1]])
+        fail = len(results) - ok
+        return {"ok": ok, "fail": fail}
+
+    def _open_email_settings(self) -> None:
+        EmailSettingsDialog(self, self.config, self._save_email_settings)
+
+    def _save_email_settings(self, config: AppConfig) -> None:
+        self.config = config
+        from .config import save_config
+
+        save_config(config)
+
+    def _export_metrics(self) -> None:
+        if not self.metrics:
+            messagebox.showinfo("提示", "暂无可导出的指标")
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["monitor_id", "ts", "key", "value"])
+            for mid, rows in self.metrics.items():
+                for row in rows:
+                    for key, val in row.items():
+                        if key == "ts":
+                            continue
+                        writer.writerow([mid, datetime.fromtimestamp(row.get("ts", 0)).isoformat(), key, val])
+        messagebox.showinfo("完成", "已导出 CSV")
+
     def _remove_monitor(self, monitor: LogMonitorConfig) -> None:
+        self._stop_monitor(monitor)
         self.monitors = [m for m in self.monitors if m.id != monitor.id]
         save_log_monitors(self.monitors)
         self._render_table()
@@ -589,18 +670,30 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
             return
 
         def worker() -> None:
-            last_size = 0
+            last_pos = 0
             path = Path(monitor.path)
+            buffer = deque(maxlen=monitor.tail_lines)
             while monitor.id in self.running_threads:
                 if not path.exists():
                     self._append_log(f"[WARN] 文件不存在：{path}")
                     break
                 try:
                     size = path.stat().st_size
-                    if size != last_size:
-                        last_size = size
-                        text = path.read_text(encoding="utf-8", errors="ignore")
-                        tail = "\n".join(text.splitlines()[-monitor.tail_lines :])
+                    if size < last_pos:
+                        last_pos = 0
+                        buffer.clear()
+                    if size != last_pos:
+                        if last_pos == 0:
+                            tail_text = _read_tail_lines(path, monitor.tail_lines)
+                            buffer.extend(tail_text.splitlines())
+                            last_pos = size
+                        else:
+                            with path.open("r", encoding="utf-8", errors="ignore") as f:
+                                f.seek(last_pos)
+                                new_text = f.read()
+                                last_pos = f.tell()
+                                buffer.extend(new_text.splitlines())
+                        tail = "\n".join(buffer)
                         self.latest_tail[monitor.id] = tail
                         self._check_markers(monitor, tail)
                         self._parse_metrics(monitor, tail)
@@ -648,8 +741,14 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self.log_view.see("end")
 
     def _append_log(self, line: str) -> None:
-        self.log_view.insert("end", line + "\n")
-        self.log_view.see("end")
+        def _write() -> None:
+            self.log_view.insert("end", line + "\n")
+            self.log_view.see("end")
+
+        if threading.current_thread() is threading.main_thread():
+            _write()
+        else:
+            self.after(0, _write)
 
     def _notify_peers(self, message: str) -> None:
         selected = self.peer_list.selected_peers()
@@ -659,67 +758,16 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         results = self._dispatch(selected, msg)
         self._append_log(f"提醒发送：成功 {results['ok']} 失败 {results['fail']}")
 
-    def _dispatch(self, peers: List[Dict[str, str]], message: str) -> Dict[str, int]:
-        if any(peer.get("email") for peer in peers) and not self.config.smtp_sender:
-            messagebox.showinfo("提示", "请先在“邮件设置”中填写发件邮箱")
-            return {"ok": 0, "fail": len(peers)}
-        targets = []
-        for peer in peers:
-            targets.append(
-                LanTarget(
-                    label=peer.get("name", "peer"),
-                    host=peer.get("ip", "127.0.0.1"),
-                    port=int(peer.get("port")) if peer.get("port") else None,
-                    email=peer.get("email", ""),
-                )
-            )
-        results = send_lan_notifications(
-            message,
-            targets,
-            smtp_host=self.config.smtp_host,
-            smtp_port=self.config.smtp_port,
-            smtp_sender=self.config.smtp_sender,
-            smtp_username=self.config.smtp_username,
-            smtp_password=self.config.smtp_password,
-            smtp_use_tls=self.config.smtp_use_tls,
-        )
-        ok = len([r for r in results if r[1]])
-        fail = len(results) - ok
-        return {"ok": ok, "fail": fail}
 
-    def _open_email_settings(self) -> None:
-        EmailSettingsDialog(self, self.config, self._save_email_settings)
+def _read_tail_lines(path: Path, limit: int, max_bytes: int = 200_000) -> str:
+    """从文件尾部读取最近的若干行，避免全量读取超大日志。"""
 
-    def _save_email_settings(self, config: AppConfig) -> None:
-        self.config = config
-        from .config import save_config
-
-        save_config(config)
-
-    def _manual_notify(self) -> None:
-        summary = []
-        for mon in self.monitors:
-            tail = (self.latest_tail.get(mon.id, "").splitlines() or ["无更新"])[-1]
-            summary.append(f"{Path(mon.path).name}: {tail}")
-        if not summary:
-            messagebox.showinfo("提示", "暂无监控数据")
-            return
-        self._notify_peers("; ".join(summary))
-
-    def _export_metrics(self) -> None:
-        if not self.metrics:
-            messagebox.showinfo("提示", "暂无可导出的指标")
-            return
-        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")])
-        if not path:
-            return
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["monitor_id", "ts", "key", "value"])
-            for mid, rows in self.metrics.items():
-                for row in rows:
-                    for key, val in row.items():
-                        if key == "ts":
-                            continue
-                        writer.writerow([mid, datetime.fromtimestamp(row.get("ts", 0)).isoformat(), key, val])
-        messagebox.showinfo("完成", "已导出 CSV")
+    if limit <= 0 or not path.exists():
+        return ""
+    with path.open("rb") as f:
+        f.seek(0, 2)
+        size = f.tell()
+        f.seek(max(size - max_bytes, 0))
+        chunk = f.read().decode("utf-8", errors="ignore")
+    lines = chunk.splitlines()
+    return "\n".join(lines[-limit:])

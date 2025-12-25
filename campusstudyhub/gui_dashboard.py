@@ -80,12 +80,12 @@ def _safe_date(s: str) -> Optional[date]:
 
 def _days_to_text(delta: int) -> str:
     if delta < 0:
-        return f"Overdue {abs(delta)}d"
+        return f"已逾期 {abs(delta)} 天"
     if delta == 0:
-        return "Due Today"
+        return "今日截止"
     if delta == 1:
-        return "Due Tomorrow"
-    return f"Due in {delta}d"
+        return "明日截止"
+    return f"剩余 {delta} 天"
 
 
 # =========================
@@ -147,16 +147,16 @@ class DashboardFrame(ctk.CTkFrame):
 
         # gpa state (local, UI-only)
         self._required_courses: List[_CourseRow] = [
-            _CourseRow("Algorithms", 4.0, "A-"),
-            _CourseRow("Systems", 3.0, "A"),
-            _CourseRow("ML", 3.0, "B+"),
-            _CourseRow("Math", 4.0, "A-"),
+            _CourseRow("算法设计", 4.0, "A-"),
+            _CourseRow("系统原理", 3.0, "A"),
+            _CourseRow("机器学习", 3.0, "B+"),
+            _CourseRow("高等数学", 4.0, "A-"),
         ]
         self._elective_courses: List[_CourseRow] = [
-            _CourseRow("Seminar", 2.0, "A"),
-            _CourseRow("Reading", 1.0, "A"),
+            _CourseRow("学术研讨", 2.0, "A"),
+            _CourseRow("文献阅读", 1.0, "A"),
         ]
-        self._gpa_tab = ctk.StringVar(value="Required Courses")
+        self._gpa_tab = ctk.StringVar(value="必修课程")
 
         # pomodoro
         self._pomo_running = False
@@ -197,9 +197,9 @@ class DashboardFrame(ctk.CTkFrame):
         self._main.grid_columnconfigure(2, weight=1, uniform="main")
         self._main.grid_rowconfigure(0, weight=1)
 
-        self.card_tasks = self._make_card(self._main, "Task List", 0, 0, nav_key="tasks")
-        self.card_gpa = self._make_card(self._main, "GPA Calculator", 0, 1, nav_key="school")
-        self.card_logs = self._make_card(self._main, "Research Logs", 0, 2, nav_key="research")
+        self.card_tasks = self._make_card(self._main, "任务清单", 0, 0, nav_key="tasks")
+        self.card_gpa = self._make_card(self._main, "GPA 计算", 0, 1, nav_key="school")
+        self.card_logs = self._make_card(self._main, "科研动态", 0, 2, nav_key="research")
 
         self._build_task_panel(self.card_tasks)
         self._build_gpa_panel(self.card_gpa)
@@ -212,10 +212,10 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.gpu_pill = _MetricPill(self._bottom, "GPU", 0, "45%")
         self.cpu_pill = _MetricPill(self._bottom, "CPU", 1, "23%")
-        self.disk_pill = _MetricPill(self._bottom, "Disk", 2, "120GB Free")
+        self.disk_pill = _MetricPill(self._bottom, "磁盘", 2, "120GB 可用")
 
-        self.card_bib = self._make_card(self._bottom, "BiBTeX Generator", 0, 3, nav_key="tools", compact=True)
-        self.card_pomo = self._make_card(self._bottom, "Pomodoro Timer", 0, 4, nav_key="pomodoro", compact=True)
+        self.card_bib = self._make_card(self._bottom, "BibTeX 生成", 0, 3, nav_key="tools", compact=True)
+        self.card_pomo = self._make_card(self._bottom, "番茄钟", 0, 4, nav_key="pomodoro", compact=True)
 
         self._build_bibtex_panel(self.card_bib)
         self._build_pomodoro_panel(self.card_pomo)
@@ -237,13 +237,13 @@ class DashboardFrame(ctk.CTkFrame):
         right.grid(row=0, column=1, sticky="e")
 
         tabs = [
-            ("Tasks", "tasks"),
-            ("Files", "files"),
-            ("School", "school"),
-            ("Research", "research"),
-            ("Monitor", "monitor"),
-            ("Tools", "tools"),
-            ("Pomodoro", "pomodoro"),
+            ("任务", "tasks"),
+            ("文件", "files"),
+            ("学校", "school"),
+            ("科研", "research"),
+            ("监控", "monitor"),
+            ("工具", "tools"),
+            ("番茄钟", "pomodoro"),
         ]
 
         # Active tab in your screenshot is "Research"
@@ -255,7 +255,7 @@ class DashboardFrame(ctk.CTkFrame):
                 left,
                 text=label,
                 height=34,
-                width=118 if label != "Pomodoro" else 130,
+                width=118 if label != "番茄钟" else 130,
                 fg_color=NAV_ACTIVE_BG if is_active else NAV_BTN_BG,
                 hover_color=NAV_BTN_HOVER,
                 font=BADGE_FONT,
@@ -306,7 +306,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkButton(
             right,
-            text="Open" if not compact else "",
+            text="打开" if not compact else "",
             width=76 if not compact else 38,
             height=28,
             fg_color=BTN_DARK,
@@ -351,7 +351,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.task_overdue_label = ctk.CTkLabel(
             self.task_overdue_bar,
-            text="No overdue tasks",
+            text="暂无逾期任务",
             font=LABEL_BOLD,
             text_color=OVERDUE_FG,
         )
@@ -369,7 +369,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.btn_task_add = ctk.CTkButton(
             actions,
-            text="Add Task",
+            text="新增任务",
             height=34,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
@@ -379,7 +379,7 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.btn_task_edit = ctk.CTkButton(
             actions,
-            text="Edit",
+            text="编辑任务",
             height=34,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
@@ -389,7 +389,7 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.btn_task_del = ctk.CTkButton(
             actions,
-            text="Delete",
+            text="删除任务",
             height=34,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
@@ -417,23 +417,23 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.btn_required = ctk.CTkButton(
             tabs,
-            text="Required Courses",
+            text="必修课程",
             height=34,
             fg_color=NAV_ACTIVE_BG,
             hover_color=NAV_BTN_HOVER,
             font=BADGE_FONT,
             corner_radius=10,
-            command=lambda: self._switch_gpa_tab("Required Courses"),
+            command=lambda: self._switch_gpa_tab("必修课程"),
         )
         self.btn_elective = ctk.CTkButton(
             tabs,
-            text="Elective Courses",
+            text="选修课程",
             height=34,
             fg_color=NAV_BTN_BG,
             hover_color=NAV_BTN_HOVER,
             font=BADGE_FONT,
             corner_radius=10,
-            command=lambda: self._switch_gpa_tab("Elective Courses"),
+            command=lambda: self._switch_gpa_tab("选修课程"),
         )
         self.btn_required.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
         self.btn_elective.grid(row=0, column=1, sticky="ew", padx=8, pady=8)
@@ -443,9 +443,9 @@ class DashboardFrame(ctk.CTkFrame):
         summary.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         summary.grid_columnconfigure((0, 1), weight=1)
 
-        self.lbl_major = ctk.CTkLabel(summary, text="Major GPA:", font=LABEL_BOLD, text_color=TEXT_MUTED)
+        self.lbl_major = ctk.CTkLabel(summary, text="专业 GPA", font=LABEL_BOLD, text_color=TEXT_MUTED)
         self.val_major = ctk.CTkLabel(summary, text="0.00", font=HEADER_FONT, text_color=OK_FG)
-        self.lbl_overall = ctk.CTkLabel(summary, text="Overall GPA:", font=LABEL_BOLD, text_color=TEXT_MUTED)
+        self.lbl_overall = ctk.CTkLabel(summary, text="总体 GPA", font=LABEL_BOLD, text_color=TEXT_MUTED)
         self.val_overall = ctk.CTkLabel(summary, text="0.00", font=HEADER_FONT, text_color=WARN_FG)
 
         self.lbl_major.grid(row=0, column=0, sticky="w", padx=12, pady=(10, 0))
@@ -463,9 +463,9 @@ class DashboardFrame(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=(10, 6))
         header.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        ctk.CTkLabel(header, text="Course", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=0, sticky="w")
-        ctk.CTkLabel(header, text="Credits", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=1)
-        ctk.CTkLabel(header, text="Grade", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=2)
+        ctk.CTkLabel(header, text="课程", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(header, text="学分", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=1)
+        ctk.CTkLabel(header, text="成绩", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=2)
         ctk.CTkLabel(header, text="", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=3, sticky="e")
 
         self.course_list = ctk.CTkScrollableFrame(table, fg_color="transparent")
@@ -479,7 +479,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkButton(
             actions,
-            text="Add Course",
+            text="新增课程",
             height=32,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
@@ -490,7 +490,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkButton(
             actions,
-            text="Recalculate",
+            text="重新计算",
             height=32,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
@@ -501,7 +501,7 @@ class DashboardFrame(ctk.CTkFrame):
 
     def _switch_gpa_tab(self, tab: str) -> None:
         self._gpa_tab.set(tab)
-        if tab == "Required Courses":
+        if tab == "必修课程":
             self.btn_required.configure(fg_color=NAV_ACTIVE_BG)
             self.btn_elective.configure(fg_color=NAV_BTN_BG)
         else:
@@ -524,7 +524,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.sub_confs.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         self.sub_confs.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self.sub_confs, text="Upcoming Conferences", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+        ctk.CTkLabel(self.sub_confs, text="近期会议", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=12, pady=(10, 6)
         )
         self.conf_list = ctk.CTkFrame(self.sub_confs, fg_color="transparent")
@@ -536,7 +536,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.sub_exps.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         self.sub_exps.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self.sub_exps, text="Experiment Logs", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+        ctk.CTkLabel(self.sub_exps, text="实验进展", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=12, pady=(10, 6)
         )
         self.exp_list = ctk.CTkFrame(self.sub_exps, fg_color="transparent")
@@ -566,7 +566,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.doi_entry = ctk.CTkEntry(
             body,
-            placeholder_text="Enter DOI (e.g., 10.1145/xxxxxx)",
+            placeholder_text="输入 DOI（例如 10.1145/xxxxxx）",
             height=34,
             fg_color=BG_CARD,
             border_color=DIVIDER,
@@ -581,7 +581,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkButton(
             btns,
-            text="Fetch DOI",
+            text="获取 DOI",
             height=32,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
@@ -592,7 +592,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkButton(
             btns,
-            text="Generate",
+            text="生成条目",
             height=32,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
@@ -611,7 +611,7 @@ class DashboardFrame(ctk.CTkFrame):
             height=120,
         )
         self.bib_box.grid(row=2, column=0, sticky="nsew")
-        self.bib_box.insert("end", "% Paste DOI then Generate.\n")
+        self.bib_box.insert("end", "% 请输入 DOI 后生成条目。\n")
         self.bib_box.configure(state="disabled")
 
     # ============================================================
@@ -636,7 +636,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.btn_pomo_start = ctk.CTkButton(
             btns,
-            text="Start",
+            text="开始",
             height=36,
             fg_color="#d57a1f",
             hover_color="#e08a34",
@@ -646,7 +646,7 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.btn_pomo_reset = ctk.CTkButton(
             btns,
-            text="Reset",
+            text="重置",
             height=36,
             fg_color="#b33636",
             hover_color="#c74747",
@@ -747,7 +747,7 @@ class DashboardFrame(ctk.CTkFrame):
             )
             self.task_overdue_bar.configure(fg_color=OVERDUE_BG)
         else:
-            self.task_overdue_label.configure(text="✓ No overdue tasks", text_color=OK_FG)
+            self.task_overdue_label.configure(text="✓ 暂无逾期任务", text_color=OK_FG)
             self.task_overdue_bar.configure(fg_color="#0f2a1a")
 
         # show only a few rows (like screenshot)
@@ -757,7 +757,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         for idx, (t, due, delta) in enumerate(display_rows):
             status = getattr(t, "status", "todo")
-            title = getattr(t, "title", "Untitled")
+            title = getattr(t, "title", "未命名")
             course = getattr(t, "course", "")
 
             # row background
@@ -800,7 +800,7 @@ class DashboardFrame(ctk.CTkFrame):
         today = date.today()
         confs = sorted(self.confs, key=lambda c: getattr(c, "submission_deadline", "9999-12-31"))[:2]
         if not confs:
-            _mini_row(self.conf_list, "📁 No upcoming conferences", "", TEXT_MUTED)
+            _mini_row(self.conf_list, "📁 暂无近期会议", "", TEXT_MUTED)
         else:
             for i, c in enumerate(confs):
                 due = _safe_date(getattr(c, "submission_deadline", ""))
@@ -809,26 +809,26 @@ class DashboardFrame(ctk.CTkFrame):
                 _mini_row(
                     self.conf_list,
                     f"📁 {c.name}",
-                    f"Deadline: {getattr(c, 'submission_deadline', 'Unknown')}",
+                    f"截止日期：{getattr(c, 'submission_deadline', '未知')}",
                     color,
                 )
 
         # experiments
         exps = self.exps[:2]
         if not exps:
-            _mini_row(self.exp_list, "🧪 No experiments", "", TEXT_MUTED)
+            _mini_row(self.exp_list, "🧪 暂无实验记录", "", TEXT_MUTED)
         else:
             for e in exps:
                 status = getattr(e, "status", "planned")
                 if status == "running":
                     color = OK_FG
-                    tag = "Running"
+                    tag = "进行中"
                 elif status in ("failed", "error"):
                     color = BAD_FG
-                    tag = "Failed"
+                    tag = "失败"
                 elif status in ("done", "completed"):
                     color = WARN_FG
-                    tag = "Completed"
+                    tag = "已完成"
                 else:
                     color = TEXT_MUTED
                     tag = status
@@ -845,21 +845,21 @@ class DashboardFrame(ctk.CTkFrame):
 
         # monitors summary (like your old code used load_log_monitors) :contentReference[oaicite:2]{index=2}
         if self.monitors:
-            lines.append(f"[Monitor] watching {len(self.monitors)} logs")
+            lines.append(f"[监控] 正在关注 {len(self.monitors)} 个日志")
 
         # append some experiment tail info
         if self.exps:
             top = self.exps[0]
             tail = getattr(top, "last_message", "") or getattr(top, "metric", "") or ""
             if tail:
-                lines.append(f"[Latest] {top.title} | {tail}")
+                lines.append(f"[最新] {top.title} | {tail}")
 
         # a few “console-like” demo lines if empty
         if not lines:
             lines = [
                 "[Epoch 10] Loss: 0.123  Accuracy: 91.4%",
-                "Warning: ...",
-                "Error: Out of Memory!",
+                "提示：...",
+                "错误：显存不足！",
             ]
 
         self._fill_box(self.console, "\n".join(lines))
@@ -871,7 +871,7 @@ class DashboardFrame(ctk.CTkFrame):
         for w in self.course_list.winfo_children():
             w.destroy()
 
-        courses = self._required_courses if self._gpa_tab.get() == "Required Courses" else self._elective_courses
+        courses = self._required_courses if self._gpa_tab.get() == "必修课程" else self._elective_courses
 
         for idx, c in enumerate(courses):
             row = ctk.CTkFrame(self.course_list, fg_color="transparent")
@@ -943,8 +943,8 @@ class DashboardFrame(ctk.CTkFrame):
         self._recalc_gpa()
 
     def _add_course_row(self) -> None:
-        courses = self._required_courses if self._gpa_tab.get() == "Required Courses" else self._elective_courses
-        courses.append(_CourseRow("New Course", 3.0, "A"))
+        courses = self._required_courses if self._gpa_tab.get() == "必修课程" else self._elective_courses
+        courses.append(_CourseRow("新课程", 3.0, "A"))
         self._render_gpa_table()
         self._recalc_gpa()
 
@@ -998,7 +998,7 @@ class DashboardFrame(ctk.CTkFrame):
             total = usage.total / (1024**3)
             free = total - used
             ratio = usage.used / usage.total if usage.total else 0.0
-            text = f"{int(free)}GB Free"
+            text = f"{int(free)}GB 可用"
             return _clamp(ratio), text
         except Exception:
             return 0.0, "--"
@@ -1006,7 +1006,7 @@ class DashboardFrame(ctk.CTkFrame):
     def _gpu_usage_ratio(self) -> Tuple[float, str]:
         system = platform.system().lower()
         if system == "darwin":
-            return 0.0, "N/A"
+            return 0.0, "不可用"
         # try gpustat
         for cmd in (["gpustat", "-i"], ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"]):
             try:
@@ -1036,16 +1036,16 @@ class DashboardFrame(ctk.CTkFrame):
         self._pomo_running = not self._pomo_running
         if self._pomo_running:
             self._pomo_last_tick = datetime.now()
-            self.btn_pomo_start.configure(text="Pause")
+            self.btn_pomo_start.configure(text="暂停")
         else:
             self._pomo_last_tick = None
-            self.btn_pomo_start.configure(text="Start")
+            self.btn_pomo_start.configure(text="开始")
 
     def _pomo_reset(self) -> None:
         self._pomo_running = False
         self._pomo_left_sec = self._pomo_total_sec
         self._pomo_last_tick = None
-        self.btn_pomo_start.configure(text="Start")
+        self.btn_pomo_start.configure(text="开始")
         self.pomo_time.configure(text=self._fmt_time(self._pomo_left_sec))
 
     def _tick_pomodoro(self) -> None:
@@ -1058,7 +1058,7 @@ class DashboardFrame(ctk.CTkFrame):
                 self.pomo_time.configure(text=self._fmt_time(self._pomo_left_sec))
                 if self._pomo_left_sec <= 0:
                     self._pomo_running = False
-                    self.btn_pomo_start.configure(text="Start")
+                    self.btn_pomo_start.configure(text="开始")
         self.after(250, self._tick_pomodoro)
 
     @staticmethod
@@ -1078,7 +1078,7 @@ class DashboardFrame(ctk.CTkFrame):
         """
         doi = self.doi_entry.get().strip()
         if not doi:
-            self._bib_set("% Please input DOI.\n")
+            self._bib_set("% 请输入 DOI。\n")
             return
 
         # attempt doi2bib
@@ -1088,15 +1088,15 @@ class DashboardFrame(ctk.CTkFrame):
                 self._bib_set(out.strip() + "\n")
                 return
             except Exception as e:
-                self._bib_set(f"% doi2bib failed: {e}\n% fallback to template.\n" + self._bib_template(doi))
+                self._bib_set(f"% doi2bib 获取失败：{e}\n% 已切换为模板。\n" + self._bib_template(doi))
                 return
 
-        self._bib_set("% Offline mode: cannot fetch DOI metadata.\n" + self._bib_template(doi))
+        self._bib_set("% 离线模式：无法获取 DOI 元数据。\n" + self._bib_template(doi))
 
     def _bib_generate(self) -> None:
         doi = self.doi_entry.get().strip()
         if not doi:
-            self._bib_set("% Please input DOI.\n")
+            self._bib_set("% 请输入 DOI。\n")
             return
         self._bib_set(self._bib_template(doi))
 
