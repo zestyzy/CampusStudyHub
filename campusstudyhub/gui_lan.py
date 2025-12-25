@@ -534,11 +534,13 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self.table = ctk.CTkScrollableFrame(table_box, height=260)
         self.table.grid(row=1, column=0, sticky="nsew", padx=6, pady=4)
 
-        bottom = ctk.CTkFrame(self, corner_radius=12)
+        bottom = ctk.CTkFrame(self, **card_kwargs())
         bottom.grid(row=3, column=0, columnspan=2, padx=10, pady=6, sticky="nsew")
         bottom.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(bottom, text="尾部快照 / 日志", font=("PingFang SC", 16, "bold")).grid(row=0, column=0, pady=4)
-        self.log_view = ctk.CTkTextbox(bottom, height=200)
+        ctk.CTkLabel(bottom, text="尾部快照 / 日志", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, pady=4
+        )
+        self.log_view = ctk.CTkTextbox(bottom, height=200, fg_color=BG_CARD)
         self.log_view.grid(row=1, column=0, sticky="nsew", padx=6, pady=4)
         btn_row = ctk.CTkFrame(bottom)
         btn_row.grid(row=2, column=0, pady=4)
@@ -601,6 +603,16 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
             return
         self._notify_peers("; ".join(summary))
         self._start_monitor(monitor)
+
+    def _manual_notify(self) -> None:
+        summary = []
+        for mon in self.monitors:
+            tail = (self.latest_tail.get(mon.id, "").splitlines() or ["无更新"])[-1]
+            summary.append(f"{Path(mon.path).name}: {tail}")
+        if not summary:
+            messagebox.showinfo("提示", "暂无监控数据")
+            return
+        self._notify_peers("; ".join(summary))
 
     def _remove_monitor(self, monitor: LogMonitorConfig) -> None:
         self._stop_monitor(monitor)
@@ -769,3 +781,17 @@ def _read_tail_lines(path: Path, limit: int, max_bytes: int = 200_000) -> str:
                             continue
                         writer.writerow([mid, datetime.fromtimestamp(row.get("ts", 0)).isoformat(), key, val])
         messagebox.showinfo("完成", "已导出 CSV")
+
+
+def _read_tail_lines(path: Path, limit: int, max_bytes: int = 200_000) -> str:
+    """从文件尾部读取最近的若干行，避免全量读取超大日志。"""
+
+    if limit <= 0 or not path.exists():
+        return ""
+    with path.open("rb") as f:
+        f.seek(0, 2)
+        size = f.tell()
+        f.seek(max(size - max_bytes, 0))
+        chunk = f.read().decode("utf-8", errors="ignore")
+    lines = chunk.splitlines()
+    return "\n".join(lines[-limit:])
