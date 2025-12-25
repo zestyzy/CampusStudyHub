@@ -1,4 +1,4 @@
-"""Research-focused utilities: experiment tracker and reading list."""
+"""Research-focused utilities: experiment tracker and reading list (CustomTkinter Version)."""
 from __future__ import annotations
 
 import tkinter as tk
@@ -6,6 +6,8 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 from typing import List, Optional
 from uuid import uuid4
+
+import customtkinter as ctk
 
 from .models import ExperimentEntry, PaperEntry
 from .storage import (
@@ -15,96 +17,121 @@ from .storage import (
     save_experiments,
     save_papers,
 )
+from .ui_style import (
+    BG_CARD,
+    HEADER_FONT,
+    LABEL_BOLD,
+    TEXT_PRIMARY,
+    TEXT_MUTED,
+    card_kwargs,
+)
+
+# 深色 Treeview 样式补丁（复用）
+def setup_treeview_style():
+    style = ttk.Style()
+    style.theme_use("clam")
+    style.configure(
+        "Treeview",
+        background="#2b2b2b",
+        foreground="#dce4ee",
+        fieldbackground="#2b2b2b",
+        borderwidth=0,
+        font=("Arial", 11),
+        rowheight=28
+    )
+    style.map("Treeview", background=[("selected", "#1f538d")])
+    style.configure(
+        "Treeview.Heading",
+        background="#3a3a3a",
+        foreground="#ffffff",
+        relief="flat",
+        font=("Arial", 11, "bold")
+    )
+    style.map("Treeview.Heading", background=[("active", "#4a4a4a")])
 
 
-class ResearchHubFrame(tk.Frame):
+class ResearchHubFrame(ctk.CTkFrame):
     """Combined research utilities for experiments and reading queue."""
 
     def __init__(self, master: tk.Widget) -> None:
-        super().__init__(master)
+        super().__init__(master, fg_color="transparent")
         self.experiments: List[ExperimentEntry] = load_experiments()
         self.papers: List[PaperEntry] = load_papers()
 
-        notebook = ttk.Notebook(self)
-        notebook.pack(fill=tk.BOTH, expand=True)
+        setup_treeview_style()
 
-        self.exp_tab = ttk.Frame(notebook)
-        notebook.add(self.exp_tab, text="Experiments")
-        self.paper_tab = ttk.Frame(notebook)
-        notebook.add(self.paper_tab, text="Reading List")
+        # 使用 CTkTabview 替代 Notebook
+        self.tabview = ctk.CTkTabview(self)
+        self.tabview.pack(fill="both", expand=True)
+        
+        self.tab_exp = self.tabview.add("实验记录 (Experiments)")
+        self.tab_paper = self.tabview.add("文献阅读 (Reading List)")
 
-        self._build_experiment_tab()
-        self._build_paper_tab()
+        self._build_experiment_tab(self.tab_exp)
+        self._build_paper_tab(self.tab_paper)
 
     # ---------------- Experiment tracker -----------------
-    def _build_experiment_tab(self) -> None:
-        form = ttk.LabelFrame(self.exp_tab, text="记录 / 编辑实验")
-        form.pack(fill=tk.X, padx=10, pady=10)
+    def _build_experiment_tab(self, parent) -> None:
+        # 左右分栏：左列表，右表单
+        parent.columnconfigure(0, weight=3)
+        parent.columnconfigure(1, weight=2)
+        parent.rowconfigure(0, weight=1)
 
-        self.exp_title_var = tk.StringVar()
-        self.exp_project_var = tk.StringVar()
-        self.exp_command_var = tk.StringVar()
-        self.exp_status_var = tk.StringVar(value="planned")
-        self.exp_metric_var = tk.StringVar()
-        self.exp_notes = tk.Text(form, height=3, width=60)
+        # === 左侧：列表 ===
+        list_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        
+        cols = ("title", "project", "status", "metric", "updated")
+        self.exp_tree = ttk.Treeview(list_frame, columns=cols, show="headings", selectmode="browse")
+        
+        self.exp_tree.heading("title", text="标题"); self.exp_tree.column("title", width=180)
+        self.exp_tree.heading("project", text="项目"); self.exp_tree.column("project", width=100)
+        self.exp_tree.heading("status", text="状态"); self.exp_tree.column("status", width=80)
+        self.exp_tree.heading("metric", text="指标"); self.exp_tree.column("metric", width=80)
+        self.exp_tree.heading("updated", text="更新时间"); self.exp_tree.column("updated", width=120)
 
-        row = 0
-        ttk.Label(form, text="实验标题").grid(row=row, column=0, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.exp_title_var, width=40).grid(
-            row=row, column=1, padx=5, pady=5, sticky=tk.W
-        )
-        ttk.Label(form, text="所属课题/项目").grid(row=row, column=2, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.exp_project_var, width=30).grid(
-            row=row, column=3, padx=5, pady=5, sticky=tk.W
-        )
-
-        row += 1
-        ttk.Label(form, text="运行命令/脚本").grid(row=row, column=0, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.exp_command_var, width=40).grid(
-            row=row, column=1, padx=5, pady=5, sticky=tk.W
-        )
-        ttk.Label(form, text="状态").grid(row=row, column=2, padx=5, pady=5, sticky=tk.W)
-        ttk.Combobox(
-            form,
-            textvariable=self.exp_status_var,
-            values=["planned", "running", "done", "failed"],
-            width=12,
-            state="readonly",
-        ).grid(row=row, column=3, padx=5, pady=5, sticky=tk.W)
-
-        row += 1
-        ttk.Label(form, text="指标/成绩").grid(row=row, column=0, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.exp_metric_var, width=20).grid(
-            row=row, column=1, padx=5, pady=5, sticky=tk.W
-        )
-        ttk.Label(form, text="备注").grid(row=row, column=2, padx=5, pady=5, sticky=tk.W)
-        self.exp_notes.grid(row=row, column=3, padx=5, pady=5, sticky=tk.W)
-
-        btn_row = ttk.Frame(form)
-        btn_row.grid(row=row + 1, column=0, columnspan=4, sticky=tk.W, padx=5, pady=5)
-        ttk.Button(btn_row, text="新增/保存", command=self._save_experiment).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn_row, text="删除", command=self._delete_experiment).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn_row, text="标记完成", command=self._mark_experiment_done).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn_row, text="导出 Markdown", command=self._export_research_md).pack(side=tk.LEFT, padx=4)
-
-        # Table
-        self.exp_tree = ttk.Treeview(
-            self.exp_tab,
-            columns=("title", "project", "status", "metric", "updated"),
-            show="headings",
-            height=10,
-        )
-        for col, label, width in [
-            ("title", "标题", 200),
-            ("project", "项目", 120),
-            ("status", "状态", 90),
-            ("metric", "指标", 80),
-            ("updated", "更新时间", 120),
-        ]:
-            self.exp_tree.heading(col, text=label)
-            self.exp_tree.column(col, width=width, anchor=tk.W)
-        self.exp_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        ysb = ttk.Scrollbar(list_frame, orient="vertical", command=self.exp_tree.yview)
+        self.exp_tree.configure(yscroll=ysb.set)
+        
+        self.exp_tree.pack(side="left", fill="both", expand=True)
+        ysb.pack(side="right", fill="y")
         self.exp_tree.bind("<<TreeviewSelect>>", self._on_exp_select)
+
+        # === 右侧：表单 ===
+        form_frame = ctk.CTkFrame(parent, **card_kwargs())
+        form_frame.grid(row=0, column=1, sticky="nsew")
+        
+        ctk.CTkLabel(form_frame, text="记录 / 编辑实验", font=HEADER_FONT).pack(anchor="w", padx=15, pady=(15, 10))
+
+        # 表单行构建
+        def _add_row(label, widget):
+            f = ctk.CTkFrame(form_frame, fg_color="transparent")
+            f.pack(fill="x", padx=15, pady=4)
+            ctk.CTkLabel(f, text=label, width=80, anchor="w").pack(side="left")
+            widget.pack(side="left", fill="x", expand=True)
+            return widget
+
+        self.exp_title_entry = _add_row("标题", ctk.CTkEntry(form_frame))
+        self.exp_proj_entry = _add_row("项目", ctk.CTkEntry(form_frame))
+        self.exp_cmd_entry = _add_row("运行命令", ctk.CTkEntry(form_frame))
+        self.exp_status_combo = _add_row("状态", ctk.CTkComboBox(form_frame, values=["planned", "running", "done", "failed"], state="readonly"))
+        self.exp_metric_entry = _add_row("指标/成绩", ctk.CTkEntry(form_frame))
+        
+        ctk.CTkLabel(form_frame, text="备注").pack(anchor="w", padx=15, pady=(8, 0))
+        self.exp_notes = ctk.CTkTextbox(form_frame, height=80)
+        self.exp_notes.pack(fill="x", padx=15, pady=(5, 15))
+
+        # 按钮
+        btn_row = ctk.CTkFrame(form_frame, fg_color="transparent")
+        btn_row.pack(fill="x", padx=15, pady=10)
+        
+        ctk.CTkButton(btn_row, text="清空/新建", fg_color="transparent", border_width=1, width=80, command=self._clear_exp_form).pack(side="left", padx=(0, 5))
+        ctk.CTkButton(btn_row, text="保存", command=self._save_experiment).pack(side="left", fill="x", expand=True, padx=5)
+        ctk.CTkButton(btn_row, text="删除", fg_color="#b33636", hover_color="#8f2a2a", width=60, command=self._delete_experiment).pack(side="right")
+        
+        export_row = ctk.CTkFrame(form_frame, fg_color="transparent")
+        export_row.pack(fill="x", padx=15, pady=(0, 15))
+        ctk.CTkButton(export_row, text="导出 Markdown 汇总", fg_color="#E08e00", hover_color="#B06e00", command=self._export_research_md).pack(fill="x")
 
         self._refresh_experiments()
 
@@ -112,234 +139,192 @@ class ResearchHubFrame(tk.Frame):
         for item in self.exp_tree.get_children():
             self.exp_tree.delete(item)
         for exp in self.experiments:
-            self.exp_tree.insert(
-                "",
-                tk.END,
-                iid=exp.id,
-                values=(exp.title, exp.project, exp.status, exp.metric, exp.updated_at or ""),
-            )
+            self.exp_tree.insert("", "end", iid=exp.id, values=(exp.title, exp.project, exp.status, exp.metric, exp.updated_at or ""))
 
-    def _on_exp_select(self, _event: tk.Event) -> None:
+    def _on_exp_select(self, _event) -> None:
         sel = self.exp_tree.selection()
-        if not sel:
-            return
-        exp_id = sel[0]
-        exp = next((e for e in self.experiments if e.id == exp_id), None)
-        if not exp:
-            return
-        self.exp_title_var.set(exp.title)
-        self.exp_project_var.set(exp.project)
-        self.exp_command_var.set(exp.command)
-        self.exp_status_var.set(exp.status)
-        self.exp_metric_var.set(exp.metric)
-        self.exp_notes.delete("1.0", tk.END)
-        self.exp_notes.insert(tk.END, exp.notes)
+        if not sel: return
+        exp = next((e for e in self.experiments if e.id == sel[0]), None)
+        if not exp: return
+        
+        self.exp_title_entry.delete(0, "end"); self.exp_title_entry.insert(0, exp.title)
+        self.exp_proj_entry.delete(0, "end"); self.exp_proj_entry.insert(0, exp.project)
+        self.exp_cmd_entry.delete(0, "end"); self.exp_cmd_entry.insert(0, exp.command)
+        self.exp_status_combo.set(exp.status)
+        self.exp_metric_entry.delete(0, "end"); self.exp_metric_entry.insert(0, exp.metric)
+        self.exp_notes.delete("1.0", "end"); self.exp_notes.insert("1.0", exp.notes)
 
-    def _collect_experiment(self, exp_id: Optional[str] = None) -> ExperimentEntry:
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-        return ExperimentEntry(
-            id=exp_id or str(uuid4()),  # type: ignore[arg-type]
-            title=self.exp_title_var.get().strip(),
-            project=self.exp_project_var.get().strip(),
-            command=self.exp_command_var.get().strip(),
-            status=self.exp_status_var.get(),
-            metric=self.exp_metric_var.get().strip(),
-            notes=self.exp_notes.get("1.0", tk.END).strip(),
-            updated_at=now_str,
-        )
+    def _clear_exp_form(self):
+        self.exp_tree.selection_remove(self.exp_tree.selection())
+        self.exp_title_entry.delete(0, "end")
+        self.exp_proj_entry.delete(0, "end")
+        self.exp_cmd_entry.delete(0, "end")
+        self.exp_metric_entry.delete(0, "end")
+        self.exp_notes.delete("1.0", "end")
+        self.exp_status_combo.set("planned")
 
     def _save_experiment(self) -> None:
-        if not self.exp_title_var.get().strip():
-            messagebox.showwarning("缺少信息", "请填写实验标题")
+        title = self.exp_title_entry.get().strip()
+        if not title:
+            messagebox.showwarning("提示", "标题不能为空")
             return
+            
         sel = self.exp_tree.selection()
+        exp_id = sel[0] if sel else str(uuid4())
+        
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        new_entry = ExperimentEntry(
+            id=exp_id,
+            title=title,
+            project=self.exp_proj_entry.get().strip(),
+            command=self.exp_cmd_entry.get().strip(),
+            status=self.exp_status_combo.get(),
+            metric=self.exp_metric_entry.get().strip(),
+            notes=self.exp_notes.get("1.0", "end").strip(),
+            updated_at=now_str
+        )
+
         if sel:
-            exp_id = sel[0]
-            new_entry = self._collect_experiment(exp_id)
-            for idx, exp in enumerate(self.experiments):
-                if exp.id == exp_id:
+            for idx, e in enumerate(self.experiments):
+                if e.id == exp_id:
                     self.experiments[idx] = new_entry
                     break
         else:
-            new_entry = self._collect_experiment()
             self.experiments.append(new_entry)
+            
         save_experiments(self.experiments)
         self._refresh_experiments()
-        messagebox.showinfo("已保存", "实验记录已保存")
 
     def _delete_experiment(self) -> None:
         sel = self.exp_tree.selection()
-        if not sel:
-            messagebox.showwarning("未选择", "请选择一条实验记录")
-            return
-        exp_id = sel[0]
-        self.experiments = [e for e in self.experiments if e.id != exp_id]
+        if not sel: return
+        if not messagebox.askyesno("确认", "删除此记录？"): return
+        self.experiments = [e for e in self.experiments if e.id != sel[0]]
         save_experiments(self.experiments)
         self._refresh_experiments()
-
-    def _mark_experiment_done(self) -> None:
-        sel = self.exp_tree.selection()
-        if not sel:
-            messagebox.showwarning("未选择", "请选择一条实验记录")
-            return
-        exp_id = sel[0]
-        for idx, exp in enumerate(self.experiments):
-            if exp.id == exp_id:
-                exp.status = "done"
-                exp.updated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
-                self.experiments[idx] = exp
-        save_experiments(self.experiments)
-        self._refresh_experiments()
+        self._clear_exp_form()
 
     def _export_research_md(self) -> None:
         export_research_summary(self.experiments, self.papers)
         messagebox.showinfo("已导出", "已生成 data/research_summary.md")
 
-    # ---------------- Reading list -----------------
-    def _build_paper_tab(self) -> None:
-        form = ttk.LabelFrame(self.paper_tab, text="论文 / 文献")
-        form.pack(fill=tk.X, padx=10, pady=10)
+    # ---------------- Reading List -----------------
+    def _build_paper_tab(self, parent) -> None:
+        # 布局逻辑同上
+        parent.columnconfigure(0, weight=3)
+        parent.columnconfigure(1, weight=2)
+        parent.rowconfigure(0, weight=1)
 
-        self.paper_title_var = tk.StringVar()
-        self.paper_doi_var = tk.StringVar()
-        self.paper_status_var = tk.StringVar(value="to_read")
-        self.paper_venue_var = tk.StringVar()
-        self.paper_url_var = tk.StringVar()
-        self.paper_notes = tk.Text(form, height=3, width=60)
+        # 左侧列表
+        list_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        
+        cols = ("title", "doi", "status")
+        self.paper_tree = ttk.Treeview(list_frame, columns=cols, show="headings", selectmode="browse")
+        self.paper_tree.heading("title", text="标题"); self.paper_tree.column("title", width=240)
+        self.paper_tree.heading("doi", text="DOI"); self.paper_tree.column("doi", width=150)
+        self.paper_tree.heading("status", text="状态"); self.paper_tree.column("status", width=80)
 
-        row = 0
-        ttk.Label(form, text="标题").grid(row=row, column=0, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.paper_title_var, width=40).grid(
-            row=row, column=1, padx=5, pady=5, sticky=tk.W
-        )
-        ttk.Label(form, text="DOI").grid(row=row, column=2, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.paper_doi_var, width=30).grid(
-            row=row, column=3, padx=5, pady=5, sticky=tk.W
-        )
-
-        row += 1
-        ttk.Label(form, text="期刊/会议").grid(row=row, column=0, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.paper_venue_var, width=30).grid(
-            row=row, column=1, padx=5, pady=5, sticky=tk.W
-        )
-        ttk.Label(form, text="状态").grid(row=row, column=2, padx=5, pady=5, sticky=tk.W)
-        ttk.Combobox(
-            form,
-            textvariable=self.paper_status_var,
-            values=["to_read", "reading", "done"],
-            state="readonly",
-            width=12,
-        ).grid(row=row, column=3, padx=5, pady=5, sticky=tk.W)
-
-        row += 1
-        ttk.Label(form, text="链接").grid(row=row, column=0, padx=5, pady=5, sticky=tk.W)
-        ttk.Entry(form, textvariable=self.paper_url_var, width=40).grid(
-            row=row, column=1, padx=5, pady=5, sticky=tk.W
-        )
-        ttk.Label(form, text="备注").grid(row=row, column=2, padx=5, pady=5, sticky=tk.W)
-        self.paper_notes.grid(row=row, column=3, padx=5, pady=5, sticky=tk.W)
-
-        btn_row = ttk.Frame(form)
-        btn_row.grid(row=row + 1, column=0, columnspan=4, sticky=tk.W, padx=5, pady=5)
-        ttk.Button(btn_row, text="新增/保存", command=self._save_paper).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn_row, text="删除", command=self._delete_paper).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn_row, text="标记完成", command=self._mark_paper_done).pack(side=tk.LEFT, padx=4)
-
-        self.paper_tree = ttk.Treeview(
-            self.paper_tab,
-            columns=("title", "doi", "status"),
-            show="headings",
-            height=10,
-        )
-        for col, label, width in [
-            ("title", "标题", 240),
-            ("doi", "DOI", 200),
-            ("status", "状态", 90),
-        ]:
-            self.paper_tree.heading(col, text=label)
-            self.paper_tree.column(col, width=width, anchor=tk.W)
-        self.paper_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        ysb = ttk.Scrollbar(list_frame, orient="vertical", command=self.paper_tree.yview)
+        self.paper_tree.configure(yscroll=ysb.set)
+        self.paper_tree.pack(side="left", fill="both", expand=True)
+        ysb.pack(side="right", fill="y")
         self.paper_tree.bind("<<TreeviewSelect>>", self._on_paper_select)
+
+        # 右侧表单
+        form_frame = ctk.CTkFrame(parent, **card_kwargs())
+        form_frame.grid(row=0, column=1, sticky="nsew")
+        
+        ctk.CTkLabel(form_frame, text="论文 / 文献", font=HEADER_FONT).pack(anchor="w", padx=15, pady=(15, 10))
+
+        def _add_row(label, widget):
+            f = ctk.CTkFrame(form_frame, fg_color="transparent")
+            f.pack(fill="x", padx=15, pady=4)
+            ctk.CTkLabel(f, text=label, width=80, anchor="w").pack(side="left")
+            widget.pack(side="left", fill="x", expand=True)
+            return widget
+
+        self.paper_title_entry = _add_row("标题", ctk.CTkEntry(form_frame))
+        self.paper_doi_entry = _add_row("DOI", ctk.CTkEntry(form_frame))
+        self.paper_venue_entry = _add_row("期刊/会议", ctk.CTkEntry(form_frame))
+        self.paper_status_combo = _add_row("状态", ctk.CTkComboBox(form_frame, values=["to_read", "reading", "done"], state="readonly"))
+        self.paper_url_entry = _add_row("链接", ctk.CTkEntry(form_frame))
+        
+        ctk.CTkLabel(form_frame, text="备注").pack(anchor="w", padx=15, pady=(8, 0))
+        self.paper_notes = ctk.CTkTextbox(form_frame, height=80)
+        self.paper_notes.pack(fill="x", padx=15, pady=(5, 15))
+
+        btn_row = ctk.CTkFrame(form_frame, fg_color="transparent")
+        btn_row.pack(fill="x", padx=15, pady=10)
+        ctk.CTkButton(btn_row, text="清空", fg_color="transparent", border_width=1, width=60, command=self._clear_paper_form).pack(side="left", padx=(0, 5))
+        ctk.CTkButton(btn_row, text="保存", command=self._save_paper).pack(side="left", fill="x", expand=True, padx=5)
+        ctk.CTkButton(btn_row, text="删除", fg_color="#b33636", hover_color="#8f2a2a", width=60, command=self._delete_paper).pack(side="right")
 
         self._refresh_papers()
 
     def _refresh_papers(self) -> None:
         for item in self.paper_tree.get_children():
             self.paper_tree.delete(item)
-        for paper in self.papers:
-            self.paper_tree.insert(
-                "",
-                tk.END,
-                iid=paper.id,
-                values=(paper.title, paper.doi, paper.status),
-            )
+        for p in self.papers:
+            self.paper_tree.insert("", "end", iid=p.id, values=(p.title, p.doi, p.status))
 
-    def _on_paper_select(self, _event: tk.Event) -> None:
+    def _on_paper_select(self, _event) -> None:
         sel = self.paper_tree.selection()
-        if not sel:
-            return
-        paper_id = sel[0]
-        paper = next((p for p in self.papers if p.id == paper_id), None)
-        if not paper:
-            return
-        self.paper_title_var.set(paper.title)
-        self.paper_doi_var.set(paper.doi)
-        self.paper_status_var.set(paper.status)
-        self.paper_venue_var.set(paper.venue)
-        self.paper_url_var.set(paper.url)
-        self.paper_notes.delete("1.0", tk.END)
-        self.paper_notes.insert(tk.END, paper.notes)
+        if not sel: return
+        p = next((x for x in self.papers if x.id == sel[0]), None)
+        if not p: return
+        
+        self.paper_title_entry.delete(0, "end"); self.paper_title_entry.insert(0, p.title)
+        self.paper_doi_entry.delete(0, "end"); self.paper_doi_entry.insert(0, p.doi)
+        self.paper_venue_entry.delete(0, "end"); self.paper_venue_entry.insert(0, p.venue)
+        self.paper_status_combo.set(p.status)
+        self.paper_url_entry.delete(0, "end"); self.paper_url_entry.insert(0, p.url)
+        self.paper_notes.delete("1.0", "end"); self.paper_notes.insert("1.0", p.notes)
 
-    def _collect_paper(self, paper_id: Optional[str] = None) -> PaperEntry:
-        return PaperEntry(
-            id=paper_id or str(uuid4()),  # type: ignore[arg-type]
-            title=self.paper_title_var.get().strip(),
-            doi=self.paper_doi_var.get().strip(),
-            venue=self.paper_venue_var.get().strip(),
-            url=self.paper_url_var.get().strip(),
-            status=self.paper_status_var.get(),
-            notes=self.paper_notes.get("1.0", tk.END).strip(),
-        )
+    def _clear_paper_form(self):
+        self.paper_tree.selection_remove(self.paper_tree.selection())
+        self.paper_title_entry.delete(0, "end")
+        self.paper_doi_entry.delete(0, "end")
+        self.paper_venue_entry.delete(0, "end")
+        self.paper_url_entry.delete(0, "end")
+        self.paper_notes.delete("1.0", "end")
+        self.paper_status_combo.set("to_read")
 
     def _save_paper(self) -> None:
-        if not self.paper_title_var.get().strip():
-            messagebox.showwarning("缺少信息", "请填写论文标题")
+        title = self.paper_title_entry.get().strip()
+        if not title:
+            messagebox.showwarning("提示", "标题不能为空")
             return
+            
         sel = self.paper_tree.selection()
+        pid = sel[0] if sel else str(uuid4())
+        
+        new_p = PaperEntry(
+            id=pid,
+            title=title,
+            doi=self.paper_doi_entry.get().strip(),
+            venue=self.paper_venue_entry.get().strip(),
+            url=self.paper_url_entry.get().strip(),
+            status=self.paper_status_combo.get(),
+            notes=self.paper_notes.get("1.0", "end").strip()
+        )
+
         if sel:
-            paper_id = sel[0]
-            updated = self._collect_paper(paper_id)
-            for idx, paper in enumerate(self.papers):
-                if paper.id == paper_id:
-                    self.papers[idx] = updated
+            for idx, p in enumerate(self.papers):
+                if p.id == pid:
+                    self.papers[idx] = new_p
                     break
         else:
-            new_entry = self._collect_paper()
-            self.papers.append(new_entry)
+            self.papers.append(new_p)
+            
         save_papers(self.papers)
         self._refresh_papers()
-        messagebox.showinfo("已保存", "已保存到阅读清单")
 
     def _delete_paper(self) -> None:
         sel = self.paper_tree.selection()
-        if not sel:
-            messagebox.showwarning("未选择", "请选择一条记录")
-            return
-        paper_id = sel[0]
-        self.papers = [p for p in self.papers if p.id != paper_id]
+        if not sel: return
+        if not messagebox.askyesno("确认", "删除此记录？"): return
+        self.papers = [p for p in self.papers if p.id != sel[0]]
         save_papers(self.papers)
         self._refresh_papers()
-
-    def _mark_paper_done(self) -> None:
-        sel = self.paper_tree.selection()
-        if not sel:
-            messagebox.showwarning("未选择", "请选择一条记录")
-            return
-        paper_id = sel[0]
-        for idx, paper in enumerate(self.papers):
-            if paper.id == paper_id:
-                paper.status = "done"
-                self.papers[idx] = paper
-                break
-        save_papers(self.papers)
-        self._refresh_papers()
+        self._clear_paper_form()

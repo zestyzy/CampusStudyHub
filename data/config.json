@@ -1,5 +1,5 @@
 {
-  "base_directory": "~/CampusStudyMaterials",
+  "base_directory": "/Users/zengyao/CampusStudyMaterials",
   "courses": [
     "Computer Science",
     "Mathematics",
@@ -7,22 +7,28 @@
   ],
   "upcoming_window_days": 7,
   "conference_window_days": 30,
-  "conference_sources": [
-    "https://dblp.org/search/publ/rss?q=CCF+A+deadline",
-    "https://eventseer.net/rss/cs"
-  ],
   "lan_targets": [
     {
       "label": "Localhost (example)",
       "host": "127.0.0.1",
       "port": 5055,
       "email": ""
+    },
+    {
+      "label": "yzeng",
+      "host": "-",
+      "port": null,
+      "email": "1005872272@qq.com"
     }
   ],
   "smtp_host": "localhost",
   "smtp_port": 25,
-  "smtp_sender": "campusstudyhub@example.com",
+  "smtp_sender": "1005872272@qq.com",
   "smtp_username": "",
   "smtp_password": "",
-  "smtp_use_tls": false
+  "smtp_use_tls": false,
+  "conference_sources": [
+    "https://dblp.org/search/publ/rss?q=CCF+A+deadline",
+    "https://eventseer.net/rss/cs"
+  ]
 }

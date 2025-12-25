@@ -5,13 +5,17 @@ import platform
 import re
 import shutil
 import subprocess
+import json
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 import customtkinter as ctk
 
+# 请确保这些模块在你的项目中存在
 from .models import ConferenceEvent, ExperimentEntry, Task
 from .storage import (
     load_conferences,
@@ -37,12 +41,10 @@ from .ui_style import (
     TEXT_PRIMARY,
     TEXT_WARN,
     card_kwargs,
-    CARD_PAD_X,
-    CARD_PAD_Y,
 )
 
 # ============================================================
-# Small local style helpers (safe fallbacks, no external deps)
+# Visual style constants
 # ============================================================
 
 NAV_BG = "#0b121b"
@@ -64,7 +66,8 @@ BAD_FG = "#ff4d4d"
 BTN_DARK = "#152133"
 BTN_DARK_HOVER = "#1a2a40"
 
-BANNER_BG = "#0b121b"
+WEATHER_BG = "#0b121b"
+WEATHER_INNER = "#0a1824"
 
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
@@ -80,29 +83,20 @@ def _safe_date(s: str) -> Optional[date]:
 
 def _days_to_text(delta: int) -> str:
     if delta < 0:
-        return f"已逾期 {abs(delta)} 天"
+        return f"Overdue {abs(delta)}d"
     if delta == 0:
-        return "今日截止"
+        return "Due Today"
     if delta == 1:
-        return "明日截止"
-    return f"剩余 {delta} 天"
+        return "Due Tomorrow"
+    return f"Due in {delta}d"
 
 
 # =========================
 # GPA helper
 # =========================
 _GRADE_POINTS = {
-    "A+": 4.0,
-    "A": 4.0,
-    "A-": 3.7,
-    "B+": 3.3,
-    "B": 3.0,
-    "B-": 2.7,
-    "C+": 2.3,
-    "C": 2.0,
-    "C-": 1.7,
-    "D": 1.0,
-    "F": 0.0,
+    "A+": 4.0, "A": 4.0, "A-": 3.7, "B+": 3.3, "B": 3.0, "B-": 2.7,
+    "C+": 2.3, "C": 2.0, "C-": 1.7, "D": 1.0, "F": 0.0,
 }
 
 
@@ -114,21 +108,11 @@ class _CourseRow:
 
 
 # ============================================================
-# DashboardFrame (complete replacement)
+# DashboardFrame (Aligned Layout + Live Data)
 # ============================================================
 class DashboardFrame(ctk.CTkFrame):
     """
-    Polished console-style dashboard that matches the provided UI reference.
-
-    Layout (matches screenshot):
-    - Top: navigation bar (Tasks / Files / School / Research / Monitor / Tools / Pomodoro)
-    - Main row:
-        Left:   Task List (with overdue highlight + list + action buttons)
-        Center: GPA Calculator (Required/Elective tabs + summary + course table)
-        Right:  Research Logs (Upcoming Conferences + Experiment Logs + console pane)
-    - Bottom row:
-        GPU pill | CPU pill | Disk pill | BibTeX Generator | Pomodoro Timer
-    - Bottom banner (left side): signature / class / date fields (optional decorative)
+    Console-style dashboard with strict alignment AND live data refresh.
     """
 
     def __init__(
@@ -145,18 +129,18 @@ class DashboardFrame(ctk.CTkFrame):
         self.exps: List[ExperimentEntry] = []
         self.monitors = []
 
-        # gpa state (local, UI-only)
+        # gpa state
         self._required_courses: List[_CourseRow] = [
-            _CourseRow("算法设计", 4.0, "A-"),
-            _CourseRow("系统原理", 3.0, "A"),
-            _CourseRow("机器学习", 3.0, "B+"),
-            _CourseRow("高等数学", 4.0, "A-"),
+            _CourseRow("Algorithms", 4.0, "A-"),
+            _CourseRow("Systems", 3.0, "A"),
+            _CourseRow("ML", 3.0, "B+"),
+            _CourseRow("Math", 4.0, "A-"),
         ]
         self._elective_courses: List[_CourseRow] = [
-            _CourseRow("学术研讨", 2.0, "A"),
-            _CourseRow("文献阅读", 1.0, "A"),
+            _CourseRow("Seminar", 2.0, "A"),
+            _CourseRow("Reading", 1.0, "A"),
         ]
-        self._gpa_tab = ctk.StringVar(value="必修课程")
+        self._gpa_tab = ctk.StringVar(value="Required Courses")
 
         # pomodoro
         self._pomo_running = False
@@ -168,114 +152,77 @@ class DashboardFrame(ctk.CTkFrame):
         self.refresh()
 
         # loops
-        self.after(1000, self._tick_clock)
         self.after(1500, self._tick_resources)
         self.after(250, self._tick_pomodoro)
+        self.after(10_000, self._tick_weather)
+        
+        # [NEW] Heartbeat for data refresh (Every 5 seconds)
+        self.after(5000, self._tick_data_refresh)
 
     # ============================================================
-    # Build UI
+    # Build UI (Layout Preserved)
     # ============================================================
     def _build_ui(self) -> None:
+        # Root layout: 5 equal columns
         self.grid_columnconfigure((0, 1, 2, 3, 4), weight=1, uniform="rootcol")
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)  # main content
-        self.grid_rowconfigure(2, weight=0)  # bottom tools
-        self.grid_rowconfigure(3, weight=0)  # banner
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=0)
 
-        # Top navigation bar
-        self._nav = ctk.CTkFrame(self, fg_color=NAV_BG, corner_radius=0)
-        self._nav.grid(row=0, column=0, columnspan=5, sticky="ew")
-        self._nav.grid_columnconfigure(0, weight=1)
-
-        self._build_navbar(self._nav)
-
-        # Main area: 3 columns (Task / GPA / Research Logs)
+        # --- 1. Main Content Area (Row 0) ---
         self._main = ctk.CTkFrame(self, fg_color=BG_DARK)
-        self._main.grid(row=1, column=0, columnspan=5, sticky="nsew", padx=12, pady=(10, 8))
+        self._main.grid(row=0, column=0, columnspan=5, sticky="nsew", padx=12, pady=(12, 6))
         self._main.grid_columnconfigure(0, weight=1, uniform="main")
         self._main.grid_columnconfigure(1, weight=1, uniform="main")
         self._main.grid_columnconfigure(2, weight=1, uniform="main")
         self._main.grid_rowconfigure(0, weight=1)
 
-        self.card_tasks = self._make_card(self._main, "任务清单", 0, 0, nav_key="tasks")
-        self.card_gpa = self._make_card(self._main, "GPA 计算", 0, 1, nav_key="school")
-        self.card_logs = self._make_card(self._main, "科研动态", 0, 2, nav_key="research")
+        self.card_tasks = self._make_card(self._main, "Task List", 0, 0, nav_key="tasks")
+        self.card_gpa = self._make_card(self._main, "GPA Calculator", 0, 1, nav_key="school")
+        self.card_logs = self._make_card(self._main, "Research Logs", 0, 2, nav_key="research")
 
         self._build_task_panel(self.card_tasks)
         self._build_gpa_panel(self.card_gpa)
         self._build_logs_panel(self.card_logs)
 
-        # Bottom row: GPU/CPU/Disk pills + BibTeX + Pomodoro
-        self._bottom = ctk.CTkFrame(self, fg_color=BG_DARK)
-        self._bottom.grid(row=2, column=0, columnspan=5, sticky="ew", padx=12, pady=(0, 10))
-        self._bottom.grid_columnconfigure((0, 1, 2, 3, 4), weight=1, uniform="bottom")
+        # --- 2. Bottom Container (Row 1) ---
+        self._bottom = ctk.CTkFrame(self, fg_color="transparent")
+        self._bottom.grid(row=1, column=0, columnspan=5, sticky="ew", padx=12, pady=(6, 12))
+        
+        self._bottom.grid_columnconfigure(0, weight=3, uniform="bot_group_l") 
+        self._bottom.grid_columnconfigure(1, weight=2, uniform="bot_group_r") 
+        self._bottom.grid_rowconfigure(0, weight=1)
 
-        self.gpu_pill = _MetricPill(self._bottom, "GPU", 0, "45%")
-        self.cpu_pill = _MetricPill(self._bottom, "CPU", 1, "23%")
-        self.disk_pill = _MetricPill(self._bottom, "磁盘", 2, "120GB 可用")
+        # === LEFT GROUP ===
+        self._bot_left = ctk.CTkFrame(self._bottom, fg_color="transparent")
+        self._bot_left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        self._bot_left.grid_columnconfigure(0, weight=1)
+        self._bot_left.grid_rowconfigure(0, weight=0)
+        self._bot_left.grid_rowconfigure(1, weight=1)
 
-        self.card_bib = self._make_card(self._bottom, "BibTeX 生成", 0, 3, nav_key="tools", compact=True)
-        self.card_pomo = self._make_card(self._bottom, "番茄钟", 0, 4, nav_key="pomodoro", compact=True)
+        # A. Resources
+        self._res_row = ctk.CTkFrame(self._bot_left, fg_color="transparent")
+        self._res_row.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        self._res_row.grid_columnconfigure((0, 1, 2), weight=1, uniform="res_pill")
+        
+        self.gpu_pill = _MetricPill(self._res_row, "GPU", 0, "—")
+        self.cpu_pill = _MetricPill(self._res_row, "CPU", 1, "—")
+        self.disk_pill = _MetricPill(self._res_row, "Disk", 2, "—")
 
+        # B. Weather
+        self.weather_bar = _WeatherBar(self._bot_left, row=1, col=0)
+        self.weather_bar.refresh()
+
+        # === RIGHT GROUP ===
+        self._bot_right = ctk.CTkFrame(self._bottom, fg_color="transparent")
+        self._bot_right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        self._bot_right.grid_columnconfigure((0, 1), weight=1, uniform="bot_tool")
+        self._bot_right.grid_rowconfigure(0, weight=1)
+
+        self.card_bib = self._make_card(self._bot_right, "BiBTeX", 0, 0, nav_key="tools", compact=True)
+        self.card_pomo = self._make_card(self._bot_right, "Pomodoro", 0, 1, nav_key="pomodoro", compact=True)
+        
         self._build_bibtex_panel(self.card_bib)
         self._build_pomodoro_panel(self.card_pomo)
-
-        # Bottom banner (left side like screenshot)
-        self._banner = ctk.CTkFrame(self, fg_color=BANNER_BG, corner_radius=14)
-        self._banner.grid(row=3, column=0, columnspan=3, sticky="ew", padx=12, pady=(0, 12))
-        self._banner.grid_columnconfigure(0, weight=1)
-        self._build_banner(self._banner)
-
-    def _build_navbar(self, master: ctk.CTkFrame) -> None:
-        bar = ctk.CTkFrame(master, fg_color="transparent")
-        bar.grid(row=0, column=0, sticky="ew", padx=10, pady=8)
-        bar.grid_columnconfigure(0, weight=1)
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.grid(row=0, column=0, sticky="w")
-        right = ctk.CTkFrame(bar, fg_color="transparent")
-        right.grid(row=0, column=1, sticky="e")
-
-        tabs = [
-            ("任务", "tasks"),
-            ("文件", "files"),
-            ("学校", "school"),
-            ("科研", "research"),
-            ("监控", "monitor"),
-            ("工具", "tools"),
-            ("番茄钟", "pomodoro"),
-        ]
-
-        # Active tab in your screenshot is "Research"
-        active_key = "research"
-
-        for i, (label, key) in enumerate(tabs):
-            is_active = key == active_key
-            btn = ctk.CTkButton(
-                left,
-                text=label,
-                height=34,
-                width=118 if label != "番茄钟" else 130,
-                fg_color=NAV_ACTIVE_BG if is_active else NAV_BTN_BG,
-                hover_color=NAV_BTN_HOVER,
-                font=BADGE_FONT,
-                corner_radius=10,
-                command=lambda k=key: self._navigate(k),
-            )
-            btn.grid(row=0, column=i, padx=(0 if i == 0 else 8, 0))
-
-        # right side: "⋯" menu
-        ctk.CTkButton(
-            right,
-            text="⋯",
-            width=44,
-            height=34,
-            fg_color=NAV_BTN_BG,
-            hover_color=NAV_BTN_HOVER,
-            font=BADGE_FONT,
-            corner_radius=10,
-            command=lambda: None,
-        ).grid(row=0, column=0, padx=(8, 0))
 
     def _make_card(
         self,
@@ -287,11 +234,10 @@ class DashboardFrame(ctk.CTkFrame):
         compact: bool = False,
     ) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(parent, **card_kwargs())
-        frame.grid(row=row, column=col, sticky="nsew", padx=10, pady=8)
+        frame.grid(row=row, column=col, sticky="nsew", padx=6, pady=6)
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(1, weight=1)
 
-        # header
         header = ctk.CTkFrame(frame, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 6 if compact else 8))
         header.grid_columnconfigure(0, weight=1)
@@ -300,26 +246,25 @@ class DashboardFrame(ctk.CTkFrame):
             row=0, column=0, sticky="w"
         )
 
-        # right: open + menu dots (like screenshot)
         right = ctk.CTkFrame(header, fg_color="transparent")
         right.grid(row=0, column=1, sticky="e")
 
         ctk.CTkButton(
             right,
-            text="打开" if not compact else "",
-            width=76 if not compact else 38,
+            text="Open" if not compact else "",
+            width=76 if not compact else 24,
             height=28,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
             font=BADGE_FONT,
             corner_radius=10,
             command=lambda k=nav_key: self._navigate(k),
-        ).grid(row=0, column=0, padx=(0, 8))
+        ).grid(row=0, column=0, padx=(0, 6))
 
         ctk.CTkButton(
             right,
             text="⋯",
-            width=38,
+            width=30 if compact else 38,
             height=28,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
@@ -328,15 +273,13 @@ class DashboardFrame(ctk.CTkFrame):
             command=lambda: None,
         ).grid(row=0, column=1)
 
-        # divider line
         div = ctk.CTkFrame(frame, fg_color=DIVIDER, height=1, corner_radius=0)
         div.grid(row=0, column=0, sticky="ew", padx=12, pady=(44, 0))
         div.lift()
-
         return frame
 
     # ============================================================
-    # Task panel
+    # Panels (Task logic updated)
     # ============================================================
     def _build_task_panel(self, card: ctk.CTkFrame) -> None:
         body = ctk.CTkFrame(card, fg_color="transparent")
@@ -344,108 +287,83 @@ class DashboardFrame(ctk.CTkFrame):
         body.grid_rowconfigure(1, weight=1)
         body.grid_columnconfigure(0, weight=1)
 
-        # Overdue highlight bar (top row)
         self.task_overdue_bar = ctk.CTkFrame(body, fg_color=OVERDUE_BG, corner_radius=10)
         self.task_overdue_bar.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         self.task_overdue_bar.grid_columnconfigure(0, weight=1)
 
         self.task_overdue_label = ctk.CTkLabel(
             self.task_overdue_bar,
-            text="暂无逾期任务",
+            text="No overdue tasks",
             font=LABEL_BOLD,
             text_color=OVERDUE_FG,
         )
         self.task_overdue_label.grid(row=0, column=0, sticky="w", padx=10, pady=8)
 
-        # List (scroll)
+        # We keep the ScrollableFrame because it fits the UI better than a Textbox
         self.task_list = ctk.CTkScrollableFrame(body, fg_color=BG_CARD, corner_radius=12)
         self.task_list.grid(row=1, column=0, sticky="nsew")
         self.task_list.grid_columnconfigure(0, weight=1)
 
-        # Bottom action buttons (Add/Edit/Delete)
         actions = ctk.CTkFrame(body, fg_color="transparent")
         actions.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         actions.grid_columnconfigure((0, 1, 2), weight=1)
 
-        self.btn_task_add = ctk.CTkButton(
-            actions,
-            text="新增任务",
-            height=34,
-            fg_color=BTN_DARK,
-            hover_color=BTN_DARK_HOVER,
-            font=BADGE_FONT,
-            corner_radius=10,
-            command=lambda: self._navigate("tasks"),
-        )
-        self.btn_task_edit = ctk.CTkButton(
-            actions,
-            text="编辑任务",
-            height=34,
-            fg_color=BTN_DARK,
-            hover_color=BTN_DARK_HOVER,
-            font=BADGE_FONT,
-            corner_radius=10,
-            command=lambda: self._navigate("tasks"),
-        )
-        self.btn_task_del = ctk.CTkButton(
-            actions,
-            text="删除任务",
-            height=34,
-            fg_color=BTN_DARK,
-            hover_color=BTN_DARK_HOVER,
-            font=BADGE_FONT,
-            corner_radius=10,
-            command=lambda: self._navigate("tasks"),
-        )
-        self.btn_task_add.grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self.btn_task_edit.grid(row=0, column=1, sticky="ew", padx=8)
-        self.btn_task_del.grid(row=0, column=2, sticky="ew", padx=(8, 0))
+        for i, (txt, cmd) in enumerate([
+            ("Add Task", lambda: self._navigate("tasks")),
+            ("Edit", lambda: self._navigate("tasks")),
+            ("Delete", lambda: self._navigate("tasks")),
+        ]):
+            ctk.CTkButton(
+                actions,
+                text=txt,
+                height=34,
+                fg_color=BTN_DARK,
+                hover_color=BTN_DARK_HOVER,
+                font=BADGE_FONT,
+                corner_radius=10,
+                command=cmd,
+            ).grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else 4, 0 if i == 2 else 4))
 
-    # ============================================================
-    # GPA panel
-    # ============================================================
     def _build_gpa_panel(self, card: ctk.CTkFrame) -> None:
         body = ctk.CTkFrame(card, fg_color="transparent")
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(10, 10))
         body.grid_columnconfigure(0, weight=1)
         body.grid_rowconfigure(2, weight=1)
 
-        # tabs (Required / Elective)
         tabs = ctk.CTkFrame(body, fg_color=BG_CARD, corner_radius=12)
         tabs.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         tabs.grid_columnconfigure((0, 1), weight=1)
 
         self.btn_required = ctk.CTkButton(
             tabs,
-            text="必修课程",
+            text="Required Courses",
             height=34,
             fg_color=NAV_ACTIVE_BG,
             hover_color=NAV_BTN_HOVER,
             font=BADGE_FONT,
             corner_radius=10,
-            command=lambda: self._switch_gpa_tab("必修课程"),
+            command=lambda: self._switch_gpa_tab("Required Courses"),
         )
         self.btn_elective = ctk.CTkButton(
             tabs,
-            text="选修课程",
+            text="Elective Courses",
             height=34,
             fg_color=NAV_BTN_BG,
             hover_color=NAV_BTN_HOVER,
             font=BADGE_FONT,
             corner_radius=10,
-            command=lambda: self._switch_gpa_tab("选修课程"),
+            command=lambda: self._switch_gpa_tab("Elective Courses"),
         )
         self.btn_required.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
         self.btn_elective.grid(row=0, column=1, sticky="ew", padx=8, pady=8)
 
-        # GPA summary
         summary = ctk.CTkFrame(body, fg_color=BG_CARD, corner_radius=12)
         summary.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         summary.grid_columnconfigure((0, 1), weight=1)
 
-        self.lbl_major = ctk.CTkLabel(summary, text="专业 GPA", font=LABEL_BOLD, text_color=TEXT_MUTED)
+        self.lbl_major = ctk.CTkLabel(summary, text="Major GPA:", font=LABEL_BOLD, text_color=TEXT_MUTED)
         self.val_major = ctk.CTkLabel(summary, text="0.00", font=HEADER_FONT, text_color=OK_FG)
-        self.lbl_overall = ctk.CTkLabel(summary, text="总体 GPA", font=LABEL_BOLD, text_color=TEXT_MUTED)
+        self.lbl_overall = ctk.CTkLabel(summary, text="Overall GPA:", font=LABEL_BOLD, text_color=TEXT_MUTED)
         self.val_overall = ctk.CTkLabel(summary, text="0.00", font=HEADER_FONT, text_color=WARN_FG)
 
         self.lbl_major.grid(row=0, column=0, sticky="w", padx=12, pady=(10, 0))
@@ -453,7 +371,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.lbl_overall.grid(row=1, column=0, sticky="w", padx=12, pady=(6, 12))
         self.val_overall.grid(row=1, column=1, sticky="e", padx=12, pady=(6, 12))
 
-        # Course table
         table = ctk.CTkFrame(body, fg_color=BG_CARD, corner_radius=12)
         table.grid(row=2, column=0, sticky="nsew")
         table.grid_columnconfigure(0, weight=1)
@@ -463,23 +380,21 @@ class DashboardFrame(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew", padx=12, pady=(10, 6))
         header.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        ctk.CTkLabel(header, text="课程", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=0, sticky="w")
-        ctk.CTkLabel(header, text="学分", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=1)
-        ctk.CTkLabel(header, text="成绩", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=2)
-        ctk.CTkLabel(header, text="", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=3, sticky="e")
+        ctk.CTkLabel(header, text="Course", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(header, text="Cr.", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=1)
+        ctk.CTkLabel(header, text="Gr.", font=LABEL_BOLD, text_color=TEXT_MUTED).grid(row=0, column=2)
 
         self.course_list = ctk.CTkScrollableFrame(table, fg_color="transparent")
         self.course_list.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.course_list.grid_columnconfigure(0, weight=1)
 
-        # bottom small actions
         actions = ctk.CTkFrame(table, fg_color="transparent")
         actions.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
         actions.grid_columnconfigure((0, 1), weight=1)
 
         ctk.CTkButton(
             actions,
-            text="新增课程",
+            text="+ Add",
             height=32,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
@@ -490,7 +405,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         ctk.CTkButton(
             actions,
-            text="重新计算",
+            text="Recalc",
             height=32,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
@@ -499,51 +414,34 @@ class DashboardFrame(ctk.CTkFrame):
             command=self._recalc_gpa,
         ).grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
-    def _switch_gpa_tab(self, tab: str) -> None:
-        self._gpa_tab.set(tab)
-        if tab == "必修课程":
-            self.btn_required.configure(fg_color=NAV_ACTIVE_BG)
-            self.btn_elective.configure(fg_color=NAV_BTN_BG)
-        else:
-            self.btn_required.configure(fg_color=NAV_BTN_BG)
-            self.btn_elective.configure(fg_color=NAV_ACTIVE_BG)
-        self._render_gpa_table()
-        self._recalc_gpa()
-
-    # ============================================================
-    # Logs panel (right)
-    # ============================================================
     def _build_logs_panel(self, card: ctk.CTkFrame) -> None:
         body = ctk.CTkFrame(card, fg_color="transparent")
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(10, 10))
         body.grid_columnconfigure(0, weight=1)
         body.grid_rowconfigure(2, weight=1)
 
-        # Upcoming Conferences (sub-card)
         self.sub_confs = ctk.CTkFrame(body, fg_color=BG_CARD, corner_radius=12)
         self.sub_confs.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         self.sub_confs.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self.sub_confs, text="近期会议", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+        ctk.CTkLabel(self.sub_confs, text="Upcoming Conferences", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=12, pady=(10, 6)
         )
         self.conf_list = ctk.CTkFrame(self.sub_confs, fg_color="transparent")
         self.conf_list.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
         self.conf_list.grid_columnconfigure(0, weight=1)
 
-        # Experiment Logs (sub-card)
         self.sub_exps = ctk.CTkFrame(body, fg_color=BG_CARD, corner_radius=12)
         self.sub_exps.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         self.sub_exps.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self.sub_exps, text="实验进展", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+        ctk.CTkLabel(self.sub_exps, text="Experiment Logs", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
             row=0, column=0, sticky="w", padx=12, pady=(10, 6)
         )
         self.exp_list = ctk.CTkFrame(self.sub_exps, fg_color="transparent")
         self.exp_list.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
         self.exp_list.grid_columnconfigure(0, weight=1)
 
-        # Console pane
         self.console = ctk.CTkTextbox(
             body,
             fg_color=BG_CARD,
@@ -556,50 +454,48 @@ class DashboardFrame(ctk.CTkFrame):
         self.console.grid(row=2, column=0, sticky="nsew")
         self.console.configure(state="disabled")
 
-    # ============================================================
-    # BibTeX panel
-    # ============================================================
     def _build_bibtex_panel(self, card: ctk.CTkFrame) -> None:
         body = ctk.CTkFrame(card, fg_color="transparent")
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(10, 10))
         body.grid_columnconfigure(0, weight=1)
+        body.grid_rowconfigure(2, weight=1)
 
         self.doi_entry = ctk.CTkEntry(
             body,
-            placeholder_text="输入 DOI（例如 10.1145/xxxxxx）",
-            height=34,
+            placeholder_text="DOI (10.1145/...)",
+            height=30,
             fg_color=BG_CARD,
             border_color=DIVIDER,
             border_width=1,
             font=LABEL_FONT,
         )
-        self.doi_entry.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        self.doi_entry.grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
         btns = ctk.CTkFrame(body, fg_color="transparent")
-        btns.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+        btns.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         btns.grid_columnconfigure((0, 1), weight=1)
 
         ctk.CTkButton(
             btns,
-            text="获取 DOI",
-            height=32,
+            text="Fetch",
+            height=28,
             fg_color=BTN_DARK,
             hover_color=BTN_DARK_HOVER,
             font=BADGE_FONT,
             corner_radius=10,
             command=self._bib_fetch,
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 4))
 
         ctk.CTkButton(
             btns,
-            text="生成条目",
-            height=32,
+            text="Gen",
+            height=28,
             fg_color=ACCENT,
             hover_color=ACCENT_ALT,
             font=BADGE_FONT,
             corner_radius=10,
             command=self._bib_generate,
-        ).grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        ).grid(row=0, column=1, sticky="ew", padx=(4, 0))
 
         self.bib_box = ctk.CTkTextbox(
             body,
@@ -608,15 +504,12 @@ class DashboardFrame(ctk.CTkFrame):
             corner_radius=12,
             font=MONO_FONT,
             text_color=TEXT_PRIMARY,
-            height=120,
+            height=60,
         )
         self.bib_box.grid(row=2, column=0, sticky="nsew")
-        self.bib_box.insert("end", "% 请输入 DOI 后生成条目。\n")
+        self.bib_box.insert("end", "% DOI -> BibTeX\n")
         self.bib_box.configure(state="disabled")
 
-    # ============================================================
-    # Pomodoro panel
-    # ============================================================
     def _build_pomodoro_panel(self, card: ctk.CTkFrame) -> None:
         body = ctk.CTkFrame(card, fg_color="transparent")
         body.grid(row=1, column=0, sticky="nsew", padx=12, pady=(10, 10))
@@ -625,10 +518,10 @@ class DashboardFrame(ctk.CTkFrame):
         self.pomo_time = ctk.CTkLabel(
             body,
             text=self._fmt_time(self._pomo_left_sec),
-            font=("Inter", 42, "bold") if isinstance(CLOCK_FONT, tuple) else CLOCK_FONT,
+            font=("Inter", 38, "bold"),
             text_color=TEXT_PRIMARY,
         )
-        self.pomo_time.grid(row=0, column=0, pady=(6, 10))
+        self.pomo_time.grid(row=0, column=0, pady=(10, 10))
 
         btns = ctk.CTkFrame(body, fg_color="transparent")
         btns.grid(row=1, column=0, sticky="ew")
@@ -636,8 +529,8 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.btn_pomo_start = ctk.CTkButton(
             btns,
-            text="开始",
-            height=36,
+            text="Start",
+            height=32,
             fg_color="#d57a1f",
             hover_color="#e08a34",
             font=BADGE_FONT,
@@ -646,43 +539,17 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.btn_pomo_reset = ctk.CTkButton(
             btns,
-            text="重置",
-            height=36,
-            fg_color="#b33636",
-            hover_color="#c74747",
+            text="↺",
+            width=32,
+            height=32,
+            fg_color=BTN_DARK,
+            hover_color=BTN_DARK_HOVER,
             font=BADGE_FONT,
             corner_radius=10,
             command=self._pomo_reset,
         )
-        self.btn_pomo_start.grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self.btn_pomo_reset.grid(row=0, column=1, sticky="ew", padx=(8, 0))
-
-    # ============================================================
-    # Banner (bottom-left decorative, like screenshot)
-    # ============================================================
-    def _build_banner(self, banner: ctk.CTkFrame) -> None:
-        banner.grid_rowconfigure(0, weight=1)
-        banner.grid_columnconfigure(0, weight=1)
-
-        # top “image-like” area (no external image dependency)
-        top = ctk.CTkFrame(banner, fg_color="#0a1824", corner_radius=14)
-        top.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-        top.grid_columnconfigure(0, weight=1)
-
-        # subtle text overlay placeholders
-        info = ctk.CTkFrame(top, fg_color="transparent")
-        info.grid(row=0, column=0, sticky="ew", padx=12, pady=18)
-        info.grid_columnconfigure((0, 1, 2), weight=1)
-
-        ctk.CTkLabel(info, text="分享人：__________", font=LABEL_FONT, text_color=TEXT_MUTED).grid(
-            row=0, column=0, sticky="w"
-        )
-        ctk.CTkLabel(info, text="班级/学号：__________", font=LABEL_FONT, text_color=TEXT_MUTED).grid(
-            row=0, column=1, sticky="w"
-        )
-        ctk.CTkLabel(info, text="日期：__________", font=LABEL_FONT, text_color=TEXT_MUTED).grid(
-            row=0, column=2, sticky="w"
-        )
+        self.btn_pomo_start.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.btn_pomo_reset.grid(row=0, column=1, sticky="ew")
 
     # ============================================================
     # Navigation
@@ -693,10 +560,18 @@ class DashboardFrame(ctk.CTkFrame):
             cb()
 
     # ============================================================
-    # Refresh & render
+    # Refresh & Data Logic [UPDATED]
     # ============================================================
+    def _tick_data_refresh(self) -> None:
+        """Background loop to auto-refresh data every 5s."""
+        try:
+            self.refresh()
+        except Exception:
+            pass
+        finally:
+            self.after(5000, self._tick_data_refresh)
+
     def refresh(self) -> None:
-        # Keep your existing data flow (same as old code) :contentReference[oaicite:1]{index=1}
         self.tasks = load_tasks()
         self.confs = load_conferences()
         self.exps = load_experiments()
@@ -707,128 +582,137 @@ class DashboardFrame(ctk.CTkFrame):
         self._render_gpa_table()
         self._recalc_gpa()
         self._render_console()
-
-        # resources updated by timer loop, but do one initial tick
         self._tick_resources()
 
-    # ------------------------------
-    # Render Tasks
-    # ------------------------------
     def _render_tasks(self) -> None:
-        # clear list
+        """
+        Render ALL tasks to the ScrollableFrame.
+        Sort order: Overdue -> Upcoming -> Later -> No Date
+        """
         for w in self.task_list.winfo_children():
             w.destroy()
 
         today = date.today()
-        # classify
-        overdue = []
-        upcoming = []
-        normal = []
+        
+        # 1. Sort logic:
+        # Group 0: Has Date (sort by date)
+        # Group 1: No Date (sort by creation id/title usually, here just title)
+        def _sort_key(t):
+            ds = getattr(t, "due_date", "") or ""
+            d = _safe_date(ds)
+            if d:
+                return (0, d)
+            return (1, date.max) 
 
-        for t in sorted(self.tasks, key=lambda x: getattr(x, "due_date", "9999-12-31")):
-            due = _safe_date(getattr(t, "due_date", ""))
-            if not due:
-                normal.append((t, None, 999999))
-                continue
-            delta = (due - today).days
-            if delta < 0:
-                overdue.append((t, due, delta))
-            elif delta <= 7:
-                upcoming.append((t, due, delta))
-            else:
-                normal.append((t, due, delta))
+        sorted_tasks = sorted(self.tasks, key=_sort_key)
+        
+        # Determine status for Badge only (Overdue count)
+        overdue_count = 0
+        for t in self.tasks:
+            d = _safe_date(getattr(t, "due_date", "") or "")
+            if d and (d - today).days < 0:
+                overdue_count += 1
 
-        # Overdue bar text (like screenshot)
-        if overdue:
-            top_task, due, delta = overdue[0]
-            self.task_overdue_label.configure(
-                text=f"⚠ {top_task.title} — {_days_to_text(delta)}",
-                text_color=OVERDUE_FG,
-            )
+        # Update Badge
+        if overdue_count > 0:
+            self.task_overdue_label.configure(text=f"⚠ {overdue_count} Overdue Tasks", text_color=OVERDUE_FG)
             self.task_overdue_bar.configure(fg_color=OVERDUE_BG)
         else:
-            self.task_overdue_label.configure(text="✓ 暂无逾期任务", text_color=OK_FG)
+            self.task_overdue_label.configure(text="✓ All caught up", text_color=OK_FG)
             self.task_overdue_bar.configure(fg_color="#0f2a1a")
 
-        # show only a few rows (like screenshot)
-        display_rows = overdue[:1] + upcoming[:3]
-        if not display_rows and normal:
-            display_rows = normal[:4]
+        if not sorted_tasks:
+            ctk.CTkLabel(self.task_list, text="No tasks found", text_color=TEXT_MUTED).pack(pady=20)
+            return
 
-        for idx, (t, due, delta) in enumerate(display_rows):
+        # Render rows
+        for idx, t in enumerate(sorted_tasks):
+            title = getattr(t, "title", "Untitled")
             status = getattr(t, "status", "todo")
-            title = getattr(t, "title", "未命名")
-            course = getattr(t, "course", "")
+            course = getattr(t, "course", "") or getattr(t, "category", "")
+            
+            due_s = getattr(t, "due_date", "") or ""
+            due = _safe_date(due_s)
+            
+            delta = None
+            if due:
+                delta = (due - today).days
 
-            # row background
-            row_bg = OVERDUE_BG if (delta is not None and delta < 0) else "transparent"
+            # Determine row style
+            # Overdue: Red BG
+            # Normal: Transparent
+            row_bg = "transparent"
+            if delta is not None and delta < 0:
+                row_bg = OVERDUE_BG
 
             row = ctk.CTkFrame(self.task_list, fg_color=row_bg, corner_radius=10)
             row.grid(row=idx, column=0, sticky="ew", padx=8, pady=6)
             row.grid_columnconfigure(1, weight=1)
 
-            # checkbox-like icon
+            # Icon
             icon = "☑" if status == "done" else "☐"
             ctk.CTkLabel(row, text=icon, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
                 row=0, column=0, rowspan=2, padx=(10, 8), pady=8, sticky="n"
             )
 
+            # Title
             ctk.CTkLabel(row, text=title, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
                 row=0, column=1, sticky="w", pady=(8, 0)
             )
 
-            subtitle = ""
+            # Subtitle (Course + Date)
+            subtitle_parts = []
             if course:
-                subtitle += course
-            if due:
-                subtitle += (" — " if subtitle else "") + _days_to_text(delta if delta is not None else 0)
+                subtitle_parts.append(course)
+            
+            if delta is not None:
+                subtitle_parts.append(_days_to_text(delta))
+                subtitle_parts.append(f"({due_s})")
+            else:
+                subtitle_parts.append("No Due Date")
 
+            subtitle = "  ·  ".join(subtitle_parts)
             ctk.CTkLabel(row, text=subtitle, font=LABEL_FONT, text_color=TEXT_MUTED).grid(
                 row=1, column=1, sticky="w", pady=(0, 8)
             )
 
-    # ------------------------------
-    # Render Logs (right column)
-    # ------------------------------
     def _render_logs(self) -> None:
         for w in self.conf_list.winfo_children():
             w.destroy()
         for w in self.exp_list.winfo_children():
             w.destroy()
 
-        # conferences
         today = date.today()
         confs = sorted(self.confs, key=lambda c: getattr(c, "submission_deadline", "9999-12-31"))[:2]
         if not confs:
-            _mini_row(self.conf_list, "📁 暂无近期会议", "", TEXT_MUTED)
+            _mini_row(self.conf_list, "📁 No upcoming conferences", "", TEXT_MUTED)
         else:
-            for i, c in enumerate(confs):
+            for c in confs:
                 due = _safe_date(getattr(c, "submission_deadline", ""))
                 delta = (due - today).days if due else 999
                 color = WARN_FG if 0 <= delta <= 14 else (BAD_FG if delta < 0 else TEXT_PRIMARY)
                 _mini_row(
                     self.conf_list,
                     f"📁 {c.name}",
-                    f"截止日期：{getattr(c, 'submission_deadline', '未知')}",
+                    f"Deadline: {getattr(c, 'submission_deadline', 'Unknown')}",
                     color,
                 )
 
-        # experiments
         exps = self.exps[:2]
         if not exps:
-            _mini_row(self.exp_list, "🧪 暂无实验记录", "", TEXT_MUTED)
+            _mini_row(self.exp_list, "🧪 No experiments", "", TEXT_MUTED)
         else:
             for e in exps:
                 status = getattr(e, "status", "planned")
                 if status == "running":
                     color = OK_FG
-                    tag = "进行中"
+                    tag = "Running"
                 elif status in ("failed", "error"):
                     color = BAD_FG
-                    tag = "失败"
+                    tag = "Failed"
                 elif status in ("done", "completed"):
                     color = WARN_FG
-                    tag = "已完成"
+                    tag = "Completed"
                 else:
                     color = TEXT_MUTED
                     tag = status
@@ -842,44 +726,52 @@ class DashboardFrame(ctk.CTkFrame):
 
     def _render_console(self) -> None:
         lines: List[str] = []
-
-        # monitors summary (like your old code used load_log_monitors) :contentReference[oaicite:2]{index=2}
         if self.monitors:
-            lines.append(f"[监控] 正在关注 {len(self.monitors)} 个日志")
-
-        # append some experiment tail info
+            lines.append(f"[Monitor] watching {len(self.monitors)} logs")
         if self.exps:
             top = self.exps[0]
             tail = getattr(top, "last_message", "") or getattr(top, "metric", "") or ""
             if tail:
-                lines.append(f"[最新] {top.title} | {tail}")
-
-        # a few “console-like” demo lines if empty
+                lines.append(f"[Latest] {top.title} | {tail}")
         if not lines:
             lines = [
                 "[Epoch 10] Loss: 0.123  Accuracy: 91.4%",
-                "提示：...",
-                "错误：显存不足！",
+                "Warning: ...",
+                "Error: Out of Memory!",
             ]
-
         self._fill_box(self.console, "\n".join(lines))
 
+    @staticmethod
+    def _fill_box(box: ctk.CTkTextbox, text: str) -> None:
+        box.configure(state="normal")
+        box.delete("1.0", "end")
+        box.insert("end", text)
+        box.configure(state="disabled")
+
     # ============================================================
-    # GPA render & compute
+    # GPA
     # ============================================================
+    def _switch_gpa_tab(self, tab: str) -> None:
+        self._gpa_tab.set(tab)
+        if tab == "Required Courses":
+            self.btn_required.configure(fg_color=NAV_ACTIVE_BG)
+            self.btn_elective.configure(fg_color=NAV_BTN_BG)
+        else:
+            self.btn_required.configure(fg_color=NAV_BTN_BG)
+            self.btn_elective.configure(fg_color=NAV_ACTIVE_BG)
+        self._render_gpa_table()
+        self._recalc_gpa()
+
     def _render_gpa_table(self) -> None:
         for w in self.course_list.winfo_children():
             w.destroy()
 
-        courses = self._required_courses if self._gpa_tab.get() == "必修课程" else self._elective_courses
+        courses = self._required_courses if self._gpa_tab.get() == "Required Courses" else self._elective_courses
 
         for idx, c in enumerate(courses):
             row = ctk.CTkFrame(self.course_list, fg_color="transparent")
             row.grid(row=idx, column=0, sticky="ew", padx=6, pady=6)
             row.grid_columnconfigure(0, weight=1)
-            row.grid_columnconfigure(1, weight=0)
-            row.grid_columnconfigure(2, weight=0)
-            row.grid_columnconfigure(3, weight=0)
 
             name = ctk.CTkEntry(
                 row,
@@ -890,11 +782,11 @@ class DashboardFrame(ctk.CTkFrame):
                 font=LABEL_FONT,
             )
             name.insert(0, c.name)
-            name.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+            name.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
             credits = ctk.CTkEntry(
                 row,
-                width=70,
+                width=40,
                 height=30,
                 fg_color=PILL_BG,
                 border_color=DIVIDER,
@@ -903,7 +795,7 @@ class DashboardFrame(ctk.CTkFrame):
                 justify="center",
             )
             credits.insert(0, f"{c.credits:g}")
-            credits.grid(row=0, column=1, padx=(0, 10))
+            credits.grid(row=0, column=1, padx=(0, 6))
 
             grade = ctk.CTkOptionMenu(
                 row,
@@ -913,18 +805,18 @@ class DashboardFrame(ctk.CTkFrame):
                 button_hover_color=BTN_DARK_HOVER,
                 font=LABEL_FONT,
                 dropdown_font=LABEL_FONT,
-                width=90,
+                width=60,
                 height=30,
             )
             grade.set(c.grade)
-            grade.grid(row=0, column=2, padx=(0, 10))
+            grade.grid(row=0, column=2, padx=(0, 6))
 
-            # status dot at far right
-            dot_color = OK_FG if _GRADE_POINTS.get(grade.get(), 0.0) >= 3.0 else (WARN_FG if _GRADE_POINTS.get(grade.get(), 0.0) >= 2.0 else BAD_FG)
-            dot = ctk.CTkLabel(row, text="●", font=LABEL_BOLD, text_color=dot_color)
-            dot.grid(row=0, column=3, sticky="e")
+            gp = _GRADE_POINTS.get(grade.get(), 0.0)
+            dot_color = OK_FG if gp >= 3.0 else (WARN_FG if gp >= 2.0 else BAD_FG)
+            ctk.CTkLabel(row, text="●", font=LABEL_BOLD, text_color=dot_color).grid(
+                row=0, column=3, sticky="e"
+            )
 
-            # bind updates
             def _sync(_evt=None, _i=idx, _name=name, _credits=credits, _grade=grade):
                 try:
                     courses[_i].name = _name.get().strip()
@@ -936,15 +828,11 @@ class DashboardFrame(ctk.CTkFrame):
 
             name.bind("<KeyRelease>", _sync)
             credits.bind("<KeyRelease>", _sync)
-            grade.configure(command=lambda _v, _i=idx: self._on_grade_change(_i))
-
-    def _on_grade_change(self, idx: int) -> None:
-        # called after menu selection; just recalc
-        self._recalc_gpa()
+            grade.configure(command=lambda _v: self._recalc_gpa())
 
     def _add_course_row(self) -> None:
-        courses = self._required_courses if self._gpa_tab.get() == "必修课程" else self._elective_courses
-        courses.append(_CourseRow("新课程", 3.0, "A"))
+        courses = self._required_courses if self._gpa_tab.get() == "Required Courses" else self._elective_courses
+        courses.append(_CourseRow("New Course", 3.0, "A"))
         self._render_gpa_table()
         self._recalc_gpa()
 
@@ -975,13 +863,12 @@ class DashboardFrame(ctk.CTkFrame):
         disk_ratio, disk_text = self._disk_usage_ratio()
 
         self.cpu_pill.set_value(cpu_ratio, f"{int(cpu_ratio * 100)}%")
-        self.gpu_pill.set_value(gpu_ratio, f"{int(gpu_ratio * 100)}%")
+        self.gpu_pill.set_value(gpu_ratio, gpu_text if gpu_text != "--" else f"{int(gpu_ratio * 100)}%")
         self.disk_pill.set_value(disk_ratio, disk_text)
 
         self.after(1500, self._tick_resources)
 
     def _cpu_usage_ratio(self) -> float:
-        # lightweight approx: loadavg / cpu_count
         cpu_count = os.cpu_count() or 1
         if hasattr(os, "getloadavg"):
             try:
@@ -994,24 +881,23 @@ class DashboardFrame(ctk.CTkFrame):
     def _disk_usage_ratio(self) -> Tuple[float, str]:
         try:
             usage = shutil.disk_usage(Path.home())
-            used = usage.used / (1024**3)
             total = usage.total / (1024**3)
-            free = total - used
+            free = usage.free / (1024**3)
             ratio = usage.used / usage.total if usage.total else 0.0
-            text = f"{int(free)}GB 可用"
-            return _clamp(ratio), text
+            return _clamp(ratio), f"{int(free)}GB Free"
         except Exception:
             return 0.0, "--"
 
     def _gpu_usage_ratio(self) -> Tuple[float, str]:
         system = platform.system().lower()
         if system == "darwin":
-            return 0.0, "不可用"
-        # try gpustat
-        for cmd in (["gpustat", "-i"], ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"]):
+            return 0.0, "N/A"
+        for cmd in (
+            ["gpustat", "-i"],
+            ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+        ):
             try:
                 out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True, timeout=2)
-                # parse percentage
                 m = re.search(r"(\d+)\s*%", out)
                 if not m:
                     m = re.search(r"^\s*(\d+)\s*$", out.strip())
@@ -1023,11 +909,14 @@ class DashboardFrame(ctk.CTkFrame):
         return 0.0, "--"
 
     # ============================================================
-    # Clock
+    # Weather periodic
     # ============================================================
-    def _tick_clock(self) -> None:
-        # (We keep clock inside Pomodoro; if you want a separate clock card, add here.)
-        self.after(1000, self._tick_clock)
+    def _tick_weather(self) -> None:
+        try:
+            self.weather_bar.refresh()
+        except Exception:
+            pass
+        self.after(600_000, self._tick_weather)  # 10 minutes
 
     # ============================================================
     # Pomodoro
@@ -1036,16 +925,16 @@ class DashboardFrame(ctk.CTkFrame):
         self._pomo_running = not self._pomo_running
         if self._pomo_running:
             self._pomo_last_tick = datetime.now()
-            self.btn_pomo_start.configure(text="暂停")
+            self.btn_pomo_start.configure(text="Pause")
         else:
             self._pomo_last_tick = None
-            self.btn_pomo_start.configure(text="开始")
+            self.btn_pomo_start.configure(text="Start")
 
     def _pomo_reset(self) -> None:
         self._pomo_running = False
         self._pomo_left_sec = self._pomo_total_sec
         self._pomo_last_tick = None
-        self.btn_pomo_start.configure(text="开始")
+        self.btn_pomo_start.configure(text="Start")
         self.pomo_time.configure(text=self._fmt_time(self._pomo_left_sec))
 
     def _tick_pomodoro(self) -> None:
@@ -1058,7 +947,7 @@ class DashboardFrame(ctk.CTkFrame):
                 self.pomo_time.configure(text=self._fmt_time(self._pomo_left_sec))
                 if self._pomo_left_sec <= 0:
                     self._pomo_running = False
-                    self.btn_pomo_start.configure(text="开始")
+                    self.btn_pomo_start.configure(text="Start")
         self.after(250, self._tick_pomodoro)
 
     @staticmethod
@@ -1071,32 +960,26 @@ class DashboardFrame(ctk.CTkFrame):
     # BibTeX
     # ============================================================
     def _bib_fetch(self) -> None:
-        """
-        Try to fetch BibTeX using system tools if available.
-        - If `doi2bib` exists: use it.
-        - Else fallback to template.
-        """
         doi = self.doi_entry.get().strip()
         if not doi:
-            self._bib_set("% 请输入 DOI。\n")
+            self._bib_set("% Please input DOI.\n")
             return
 
-        # attempt doi2bib
         if shutil.which("doi2bib"):
             try:
                 out = subprocess.check_output(["doi2bib", doi], text=True, timeout=5)
                 self._bib_set(out.strip() + "\n")
                 return
             except Exception as e:
-                self._bib_set(f"% doi2bib 获取失败：{e}\n% 已切换为模板。\n" + self._bib_template(doi))
+                self._bib_set(f"% doi2bib failed: {e}\n% fallback to template.\n" + self._bib_template(doi))
                 return
 
-        self._bib_set("% 离线模式：无法获取 DOI 元数据。\n" + self._bib_template(doi))
+        self._bib_set("% Offline mode: cannot fetch DOI metadata.\n" + self._bib_template(doi))
 
     def _bib_generate(self) -> None:
         doi = self.doi_entry.get().strip()
         if not doi:
-            self._bib_set("% 请输入 DOI。\n")
+            self._bib_set("% Please input DOI.\n")
             return
         self._bib_set(self._bib_template(doi))
 
@@ -1115,43 +998,32 @@ class DashboardFrame(ctk.CTkFrame):
     def _bib_set(self, text: str) -> None:
         self._fill_box(self.bib_box, text)
 
-    # ============================================================
-    # Small textbox helper
-    # ============================================================
-    @staticmethod
-    def _fill_box(box: ctk.CTkTextbox, text: str) -> None:
-        box.configure(state="normal")
-        box.delete("1.0", "end")
-        box.insert("end", text)
-        box.configure(state="disabled")
-
 
 # ============================================================
-# UI Widgets
+# UI Widgets (Grid-Aware)
 # ============================================================
 class _MetricPill:
-    """Bottom resource pill like screenshot (GPU/CPU/Disk)."""
+    """Bottom resource pill (GPU/CPU/Disk)."""
 
     def __init__(self, parent: ctk.CTkFrame, title: str, col: int, right_text: str) -> None:
         self.frame = ctk.CTkFrame(parent, fg_color=PILL_BG, corner_radius=12)
-        self.frame.grid(row=0, column=col, sticky="ew", padx=10, pady=8)
+        # Using nsew to fill the grid cell perfectly
+        self.frame.grid(row=0, column=col, sticky="nsew", padx=6, pady=6)
         self.frame.grid_columnconfigure(1, weight=1)
 
         self.lbl = ctk.CTkLabel(self.frame, text=f"{title}:", font=LABEL_BOLD, text_color=TEXT_PRIMARY)
-        self.lbl.grid(row=0, column=0, padx=(12, 8), pady=10, sticky="w")
+        self.lbl.grid(row=0, column=0, padx=(12, 6), pady=10, sticky="w")
+
+        self.bar = ctk.CTkProgressBar(self.frame, fg_color=PILL_BAR_BG, progress_color=OK_FG, height=8)
+        self.bar.grid(row=0, column=1, padx=6, pady=10, sticky="ew")
+        self.bar.set(0.0)
 
         self.value = ctk.CTkLabel(self.frame, text=right_text, font=LABEL_BOLD, text_color=OK_FG)
-        self.value.grid(row=0, column=2, padx=(8, 12), pady=10, sticky="e")
-
-        self.bar = ctk.CTkProgressBar(self.frame, fg_color=PILL_BAR_BG, progress_color=OK_FG, height=10)
-        self.bar.grid(row=0, column=1, padx=8, pady=10, sticky="ew")
-        self.bar.set(0.3)
+        self.value.grid(row=0, column=2, padx=(6, 12), pady=10, sticky="e")
 
     def set_value(self, ratio: float, text: str) -> None:
         ratio = _clamp(ratio)
         self.bar.set(ratio)
-
-        # color by severity
         if ratio < 0.6:
             col = OK_FG
         elif ratio < 0.85:
@@ -1162,17 +1034,110 @@ class _MetricPill:
         self.bar.configure(progress_color=col)
 
 
+class _WeatherBar:
+    """
+    Bottom weather bar (Expands to fill height).
+    """
+
+    def __init__(self, parent: ctk.CTkFrame, row: int, col: int) -> None:
+        # Outer frame expands (sticky="nsew") to match the BibTeX/Pomo height
+        self.outer = ctk.CTkFrame(parent, fg_color=WEATHER_BG, corner_radius=18)
+        self.outer.grid(row=row, column=col, sticky="nsew", padx=6, pady=6)
+        self.outer.grid_columnconfigure(0, weight=1)
+        self.outer.grid_rowconfigure(0, weight=1) # Center vertically
+
+        self.inner = ctk.CTkFrame(self.outer, fg_color=WEATHER_INNER, corner_radius=16)
+        self.inner.grid(row=0, column=0, sticky="ew", padx=8, pady=8)
+
+        # layout: left fixed, mid stretch, right fixed
+        self.inner.grid_columnconfigure(0, weight=0)
+        self.inner.grid_columnconfigure(1, weight=1)
+        self.inner.grid_columnconfigure(2, weight=0)
+
+        # LEFT
+        left = ctk.CTkFrame(self.inner, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="w", padx=(6, 10), pady=4)
+
+        ctk.CTkLabel(left, text="Weather", font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
+            row=0, column=0, sticky="w", padx=(0, 8)
+        )
+
+        self.city = ctk.CTkEntry(
+            left,
+            width=140,
+            height=28,
+            fg_color=PILL_BG,
+            border_color=DIVIDER,
+            border_width=1,
+            font=LABEL_FONT,
+            placeholder_text="City",
+        )
+        self.city.grid(row=0, column=1, sticky="w")
+        self.city.insert(0, "Singapore")
+
+        # MID
+        mid = ctk.CTkFrame(self.inner, fg_color="transparent")
+        mid.grid(row=0, column=1, sticky="ew", padx=10, pady=4)
+        mid.grid_columnconfigure(0, weight=1)
+
+        self.line1 = ctk.CTkLabel(mid, text="—", font=LABEL_BOLD, text_color=TEXT_PRIMARY)
+        self.line1.grid(row=0, column=0, sticky="w")
+
+        # RIGHT
+        right = ctk.CTkFrame(self.inner, fg_color="transparent")
+        right.grid(row=0, column=2, sticky="e", padx=(10, 6), pady=4)
+        
+        self.btn = ctk.CTkButton(
+            right,
+            text="⟳",
+            width=32,
+            height=28,
+            fg_color=BTN_DARK,
+            hover_color=BTN_DARK_HOVER,
+            font=BADGE_FONT,
+            corner_radius=10,
+            command=self.refresh,
+        )
+        self.btn.grid(row=0, column=0, sticky="e")
+
+        self.time = ctk.CTkLabel(right, text="", font=DATE_FONT, text_color=TEXT_MUTED)
+        self.time.grid(row=0, column=1, sticky="e", padx=(8, 0))
+
+    def refresh(self) -> None:
+        city = (self.city.get() or "").strip() or "Singapore"
+        try:
+            data = self._fetch_wttr(city)
+            if not data:
+                raise RuntimeError("empty data")
+
+            current = data.get("current_condition", [{}])[0]
+            area = data.get("nearest_area", [{}])[0].get("areaName", [{}])[0].get("value", city)
+
+            temp_c = current.get("temp_C", "?")
+            desc = current.get("weatherDesc", [{}])[0].get("value", "—")
+
+            self.line1.configure(text=f"{area}: {temp_c}°C ({desc})", text_color=TEXT_PRIMARY)
+            self.time.configure(text=datetime.now().strftime("%H:%M"))
+        except Exception:
+            self.line1.configure(text=f"{city}: Offline", text_color=TEXT_PRIMARY)
+            self.time.configure(text=datetime.now().strftime("%H:%M"))
+
+    @staticmethod
+    def _fetch_wttr(city: str) -> Optional[dict]:
+        q = urllib.parse.quote(city)
+        url = f"https://wttr.in/{q}?format=j1"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            raw = resp.read().decode("utf-8", errors="ignore")
+        return json.loads(raw) if raw else None
+
+
 def _mini_row(parent: ctk.CTkFrame, title: str, subtitle: str, color: str) -> None:
     row = ctk.CTkFrame(parent, fg_color="transparent")
     row.grid(sticky="ew", pady=4)
     row.grid_columnconfigure(0, weight=1)
 
-    ctk.CTkLabel(row, text=title, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(
-        row=0, column=0, sticky="w"
-    )
+    ctk.CTkLabel(row, text=title, font=LABEL_BOLD, text_color=TEXT_PRIMARY).grid(row=0, column=0, sticky="w")
     if subtitle:
-        ctk.CTkLabel(row, text=subtitle, font=LABEL_FONT, text_color=TEXT_MUTED).grid(
-            row=1, column=0, sticky="w"
-        )
-
+        ctk.CTkLabel(row, text=subtitle, font=LABEL_FONT, text_color=TEXT_MUTED).grid(row=1, column=0, sticky="w")
     ctk.CTkLabel(row, text="●", font=LABEL_BOLD, text_color=color).grid(row=0, column=1, rowspan=2, sticky="e")

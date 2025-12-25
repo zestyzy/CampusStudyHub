@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "title": "123123",
+    "course": "Computer Science",
+    "task_type": "23123",
+    "due_date": "2025-12-26",
+    "priority": "medium",
+    "status": "todo",
+    "notes": "",
+    "id": "3632de1d-4f08-40d4-8c89-25f1054cb88e"
+  }
+]

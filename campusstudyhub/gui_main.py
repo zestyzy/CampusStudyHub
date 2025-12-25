@@ -5,7 +5,9 @@ import customtkinter as ctk
 
 from .config import load_config, save_config
 from .gui_dashboard import DashboardFrame
-from .gui_lan import ConferenceLANFrame, ExperimentMonitorFrame, PeerManager
+# 修改点 1: 分别导入
+from .gui_conferences import ConferencesFrame
+from .gui_experiments import ExperimentMonitorFrame, PeerManager
 from .gui_monitor import ResourceMonitorFrame
 from .gui_pomodoro import PomodoroFrame
 from .gui_tools import BibtexFrame, FigureComposerFrame, GPAFrame
@@ -57,15 +59,22 @@ def launch_app() -> None:
     # 科研辅助：会议通知、实验监控、资源监控、BibTeX、科研拼图
     research_inner = ctk.CTkTabview(research_tab)
     research_inner.pack(fill="both", expand=True, padx=10, pady=10)
+    
+    # 实验监控使用的旧版管理器（暂保留，用于 experiment frame）
     manager = PeerManager()
+    
     conf_tab = research_inner.add("会议通知")
     exp_tab = research_inner.add("实验监控")
     monitor_tab = research_inner.add("资源监控")
     bib_tab = research_inner.add("BibTeX 生成")
     fig_tab = research_inner.add("科研拼图")
 
-    ConferenceLANFrame(conf_tab, manager).pack(fill="both", expand=True, padx=10, pady=10)
+    # 修改点 2: 实例化新版会议界面（注意参数变化）
+    ConferencesFrame(conf_tab, config, on_config_update).pack(fill="both", expand=True, padx=10, pady=10)
+    
+    # 实验监控仍使用旧逻辑（从 gui_experiments 导入）
     ExperimentMonitorFrame(exp_tab, manager).pack(fill="both", expand=True, padx=10, pady=10)
+    
     ResourceMonitorFrame(monitor_tab).pack(fill="both", expand=True, padx=10, pady=10)
     BibtexFrame(bib_tab).pack(fill="both", expand=True, padx=10, pady=10)
     FigureComposerFrame(fig_tab).pack(fill="both", expand=True, padx=10, pady=10)
