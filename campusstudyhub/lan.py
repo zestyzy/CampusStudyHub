@@ -15,6 +15,9 @@ def send_lan_notifications(
     smtp_host: str = "localhost",
     smtp_port: int = 25,
     smtp_sender: str | None = None,
+    smtp_username: str | None = None,
+    smtp_password: str | None = None,
+    smtp_use_tls: bool = False,
 ) -> List[Tuple[LanTarget, bool, str]]:
     """Send a short UTF-8 message via UDP and optionally email.
 
@@ -52,6 +55,10 @@ def send_lan_notifications(
                     msg["Subject"] = "CampusStudyHub 通知"
                     msg.set_content(message)
                     with smtplib.SMTP(host=smtp_host, port=smtp_port, timeout=8) as server:
+                        if smtp_use_tls:
+                            server.starttls()
+                        if smtp_username and smtp_password:
+                            server.login(smtp_username, smtp_password)
                         server.send_message(msg)
                 except Exception as exc:  # pragma: no cover - best effort
                     mail_ok = False

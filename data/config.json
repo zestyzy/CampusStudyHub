@@ -21,5 +21,8 @@
   ],
   "smtp_host": "localhost",
   "smtp_port": 25,
-  "smtp_sender": "campusstudyhub@example.com"
+  "smtp_sender": "campusstudyhub@example.com",
+  "smtp_username": "",
+  "smtp_password": "",
+  "smtp_use_tls": false
 }

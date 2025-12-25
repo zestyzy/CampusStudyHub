@@ -61,7 +61,7 @@ def launch_app() -> None:
     conf_tab = research_inner.add("会议通知")
     exp_tab = research_inner.add("实验监控")
     monitor_tab = research_inner.add("资源监控")
-    bib_tab = research_inner.add("BibTeX")
+    bib_tab = research_inner.add("BibTeX 生成")
     fig_tab = research_inner.add("科研拼图")
 
     ConferenceLANFrame(conf_tab, manager).pack(fill="both", expand=True, padx=10, pady=10)
@@ -76,7 +76,7 @@ def launch_app() -> None:
     # 总览：需要导航回调以跳转到各功能
     navigator = {
         "tasks": lambda: (tabview.set("学校事项"), school_inner.set("任务")),
-        "research": lambda: (tabview.set("科研辅助"), research_inner.set("BibTeX")),
+        "research": lambda: (tabview.set("科研辅助"), research_inner.set("BibTeX 生成")),
         "conferences": lambda: (tabview.set("科研辅助"), research_inner.set("会议通知")),
         "experiments": lambda: (tabview.set("科研辅助"), research_inner.set("实验监控")),
         "monitor": lambda: (tabview.set("科研辅助"), research_inner.set("资源监控")),
@@ -89,4 +89,3 @@ def launch_app() -> None:
 
 if __name__ == "__main__":
     launch_app()
-

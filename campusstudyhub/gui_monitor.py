@@ -8,6 +8,8 @@ from typing import Iterable
 
 import customtkinter as ctk
 
+from .ui_style import ACCENT, ACCENT_ALT, BG_CARD, BG_DARK, LABEL_BOLD, TEXT_PRIMARY
+
 
 class ResourceMonitorFrame(ctk.CTkFrame):
     """展示常用资源监控命令输出（gpustat、top、df -h）。"""
@@ -18,22 +20,31 @@ class ResourceMonitorFrame(ctk.CTkFrame):
         self.refresh_all()
 
     def _build_ui(self) -> None:
+        self.configure(fg_color=BG_DARK)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
         self.grid_rowconfigure(4, weight=1)
         self.grid_rowconfigure(6, weight=1)
 
         header = ctk.CTkLabel(
-            self, text="计算资源监控", font=("PingFang SC", 22, "bold")
+            self, text="计算资源监控", font=("PingFang SC", 22, "bold"), text_color=TEXT_PRIMARY
         )
         header.grid(row=0, column=0, pady=(4, 8))
 
-        btn_row = ctk.CTkFrame(self, fg_color=("#1f1f1f", "#1f1f1f"))
-        btn_row.grid(row=1, column=0, pady=4, padx=8, sticky="ew")
-        btn_row.grid_columnconfigure(0, weight=1)
+        btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        btn_row.grid(row=1, column=0, pady=4, padx=12, sticky="ew")
+        btn_row.grid_columnconfigure(0, weight=0, minsize=150)
+        btn_row.grid_rowconfigure(0, minsize=40)
         ctk.CTkButton(
-            btn_row, text="刷新全部", command=self.refresh_all, width=140
-        ).grid(row=0, column=0, padx=6, pady=6, sticky="w")
+            btn_row,
+            text="刷新全部",
+            command=self.refresh_all,
+            width=140,
+            height=32,
+            fg_color=ACCENT,
+            hover_color=ACCENT_ALT,
+            font=LABEL_BOLD,
+        ).grid(row=0, column=0, padx=6, pady=4, sticky="w")
 
         # 采用“卡片式”布局让各监控区域更清晰。
         self.gpu_box = self._create_card(
@@ -79,11 +90,11 @@ class ResourceMonitorFrame(ctk.CTkFrame):
     def _create_card(self, row: int, title: str, height: int) -> ctk.CTkTextbox:
         """创建带标题的卡片式文本框。"""
 
-        card = ctk.CTkFrame(self, corner_radius=10, fg_color=("#171717", "#171717"))
+        card = ctk.CTkFrame(self, corner_radius=12, fg_color=BG_CARD)
         card.grid(row=row, column=0, padx=8, pady=(6, 2), sticky="nsew")
         card.grid_columnconfigure(0, weight=1)
         title_label = ctk.CTkLabel(
-            card, text=title, anchor="w", font=("PingFang SC", 15, "bold")
+            card, text=title, anchor="w", font=("PingFang SC", 15, "bold"), text_color=TEXT_PRIMARY
         )
         title_label.grid(row=0, column=0, sticky="w", padx=10, pady=(10, 4))
 

@@ -89,6 +89,75 @@ class PeerChecklist(ctk.CTkFrame):
         return [p for p, v in zip(self.manager.peers, self.vars) if v.get()]
 
 
+class EmailSettingsDialog(ctk.CTkToplevel):
+    """邮件发送设置对话框（SMTP）。"""
+
+    def __init__(self, master: ctk.CTkBaseClass, config: AppConfig, on_save) -> None:
+        super().__init__(master)
+        self.title("邮件发送设置")
+        self.resizable(False, False)
+        self.config = config
+        self.on_save = on_save
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        self.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(self, text="SMTP 主机").grid(row=0, column=0, padx=10, pady=6, sticky="e")
+        ctk.CTkLabel(self, text="SMTP 端口").grid(row=1, column=0, padx=10, pady=6, sticky="e")
+        ctk.CTkLabel(self, text="发件邮箱").grid(row=2, column=0, padx=10, pady=6, sticky="e")
+        ctk.CTkLabel(self, text="用户名(可选)").grid(row=3, column=0, padx=10, pady=6, sticky="e")
+        ctk.CTkLabel(self, text="密码(可选)").grid(row=4, column=0, padx=10, pady=6, sticky="e")
+
+        self.host_entry = ctk.CTkEntry(self)
+        self.host_entry.insert(0, self.config.smtp_host)
+        self.host_entry.grid(row=0, column=1, padx=10, pady=6, sticky="ew")
+
+        self.port_entry = ctk.CTkEntry(self, width=100)
+        self.port_entry.insert(0, str(self.config.smtp_port))
+        self.port_entry.grid(row=1, column=1, padx=10, pady=6, sticky="w")
+
+        self.sender_entry = ctk.CTkEntry(self)
+        self.sender_entry.insert(0, self.config.smtp_sender)
+        self.sender_entry.grid(row=2, column=1, padx=10, pady=6, sticky="ew")
+
+        self.user_entry = ctk.CTkEntry(self)
+        self.user_entry.insert(0, self.config.smtp_username)
+        self.user_entry.grid(row=3, column=1, padx=10, pady=6, sticky="ew")
+
+        self.pass_entry = ctk.CTkEntry(self, show="*")
+        self.pass_entry.insert(0, self.config.smtp_password)
+        self.pass_entry.grid(row=4, column=1, padx=10, pady=6, sticky="ew")
+
+        self.tls_var = ctk.BooleanVar(value=self.config.smtp_use_tls)
+        ctk.CTkCheckBox(self, text="使用 TLS 加密", variable=self.tls_var).grid(
+            row=5, column=1, padx=10, pady=4, sticky="w"
+        )
+
+        btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        btn_row.grid(row=6, column=0, columnspan=2, pady=10)
+        ctk.CTkButton(btn_row, text="保存", command=self._save).grid(row=0, column=0, padx=6)
+        ctk.CTkButton(btn_row, text="取消", command=self.destroy).grid(row=0, column=1, padx=6)
+
+    def _save(self) -> None:
+        host = self.host_entry.get().strip() or "localhost"
+        try:
+            port = int(self.port_entry.get().strip() or 25)
+        except ValueError:
+            messagebox.showinfo("提示", "SMTP 端口需要是数字")
+            return
+        sender = self.sender_entry.get().strip()
+        username = self.user_entry.get().strip()
+        password = self.pass_entry.get().strip()
+        self.config.smtp_host = host
+        self.config.smtp_port = port
+        self.config.smtp_sender = sender
+        self.config.smtp_username = username
+        self.config.smtp_password = password
+        self.config.smtp_use_tls = bool(self.tls_var.get())
+        self.on_save(self.config)
+        self.destroy()
+
+
 class ConferenceLANFrame(ctk.CTkFrame):
     """CCF 会议通知：支持本地/网络源切换、星标与定向提醒。"""
 
@@ -121,6 +190,9 @@ class ConferenceLANFrame(ctk.CTkFrame):
         ctk.CTkButton(action_row, text="全选", command=self.peer_list.select_all, width=90).grid(row=0, column=0, padx=4)
         ctk.CTkButton(action_row, text="发送提醒", command=self._send, width=120).grid(row=0, column=1, padx=4)
         ctk.CTkButton(action_row, text="刷新联系人", command=self.peer_list.refresh, width=120).grid(row=0, column=2, padx=4)
+        ctk.CTkButton(action_row, text="邮件设置", command=self._open_email_settings, width=110).grid(
+            row=0, column=3, padx=4
+        )
 
         add_row = ctk.CTkFrame(peer_box)
         add_row.grid(row=3, column=0, padx=6, pady=6, sticky="ew")
@@ -303,6 +375,9 @@ class ConferenceLANFrame(ctk.CTkFrame):
         messagebox.showinfo("完成", f"已尝试发送，成功 {results['ok']} 条，失败 {results['fail']} 条")
 
     def _dispatch(self, peers: List[Dict[str, str]], message: str) -> Dict[str, int]:
+        if any(peer.get("email") for peer in peers) and not self.config.smtp_sender:
+            messagebox.showinfo("提示", "请先在“邮件设置”中填写发件邮箱")
+            return {"ok": 0, "fail": len(peers)}
         targets = []
         for peer in peers:
             targets.append(
@@ -319,10 +394,22 @@ class ConferenceLANFrame(ctk.CTkFrame):
             smtp_host=self.config.smtp_host,
             smtp_port=self.config.smtp_port,
             smtp_sender=self.config.smtp_sender,
+            smtp_username=self.config.smtp_username,
+            smtp_password=self.config.smtp_password,
+            smtp_use_tls=self.config.smtp_use_tls,
         )
         ok = len([r for r in results if r[1]])
         fail = len(results) - ok
         return {"ok": ok, "fail": fail}
+
+    def _open_email_settings(self) -> None:
+        EmailSettingsDialog(self, self.config, self._save_email_settings)
+
+    def _save_email_settings(self, config: AppConfig) -> None:
+        self.config = config
+        from .config import save_config
+
+        save_config(config)
 
     # ---- 网络抓取与定时刷新 ------------------------------------------
     def _fetch_online(self) -> None:
@@ -382,6 +469,7 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self.running_threads: Dict[str, threading.Thread] = {}
         self.latest_tail: Dict[str, str] = {}
         self.metrics: Dict[str, List[Dict[str, float]]] = {}
+        self.config = load_config()
         self._build_ui()
         self._render_table()
 
@@ -397,6 +485,9 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self.peer_list.grid(row=1, column=0, padx=8, pady=4, sticky="nsew")
         ctk.CTkButton(peer_box, text="全选", command=self.peer_list.select_all, width=100).grid(row=2, column=0, pady=4)
         ctk.CTkButton(peer_box, text="手动提醒", command=self._manual_notify, width=120).grid(row=3, column=0, pady=4)
+        ctk.CTkButton(peer_box, text="邮件设置", command=self._open_email_settings, width=120).grid(
+            row=4, column=0, pady=4
+        )
 
         config_box = ctk.CTkFrame(self, corner_radius=12)
         config_box.grid(row=1, column=1, padx=10, pady=6, sticky="nsew")
@@ -569,6 +660,9 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self._append_log(f"提醒发送：成功 {results['ok']} 失败 {results['fail']}")
 
     def _dispatch(self, peers: List[Dict[str, str]], message: str) -> Dict[str, int]:
+        if any(peer.get("email") for peer in peers) and not self.config.smtp_sender:
+            messagebox.showinfo("提示", "请先在“邮件设置”中填写发件邮箱")
+            return {"ok": 0, "fail": len(peers)}
         targets = []
         for peer in peers:
             targets.append(
@@ -582,13 +676,25 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         results = send_lan_notifications(
             message,
             targets,
-            smtp_host=load_config().smtp_host,
-            smtp_port=load_config().smtp_port,
-            smtp_sender=load_config().smtp_sender,
+            smtp_host=self.config.smtp_host,
+            smtp_port=self.config.smtp_port,
+            smtp_sender=self.config.smtp_sender,
+            smtp_username=self.config.smtp_username,
+            smtp_password=self.config.smtp_password,
+            smtp_use_tls=self.config.smtp_use_tls,
         )
         ok = len([r for r in results if r[1]])
         fail = len(results) - ok
         return {"ok": ok, "fail": fail}
+
+    def _open_email_settings(self) -> None:
+        EmailSettingsDialog(self, self.config, self._save_email_settings)
+
+    def _save_email_settings(self, config: AppConfig) -> None:
+        self.config = config
+        from .config import save_config
+
+        save_config(config)
 
     def _manual_notify(self) -> None:
         summary = []

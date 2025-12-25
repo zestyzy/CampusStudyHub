@@ -24,6 +24,9 @@ class AppConfig:
     smtp_host: str = "localhost"
     smtp_port: int = 25
     smtp_sender: str = "campusstudyhub@example.com"
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = False
     conference_sources: List[str] = field(default_factory=list)
 
     @classmethod
@@ -40,6 +43,9 @@ class AppConfig:
             smtp_host="localhost",
             smtp_port=25,
             smtp_sender="campusstudyhub@example.com",
+            smtp_username="",
+            smtp_password="",
+            smtp_use_tls=False,
             conference_sources=[
                 "https://dblp.org/search/publ/rss?q=CCF+A+deadline",
                 "https://eventseer.net/rss/cs",
@@ -100,6 +106,9 @@ def _config_from_dict(raw: dict) -> AppConfig:
         smtp_host=raw.get("smtp_host", "localhost"),
         smtp_port=raw.get("smtp_port", 25),
         smtp_sender=raw.get("smtp_sender", "campusstudyhub@example.com"),
+        smtp_username=raw.get("smtp_username", ""),
+        smtp_password=raw.get("smtp_password", ""),
+        smtp_use_tls=raw.get("smtp_use_tls", False),
         conference_sources=raw.get("conference_sources", AppConfig.default().conference_sources),
     )
 
