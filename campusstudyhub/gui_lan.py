@@ -592,6 +592,16 @@ class ExperimentMonitorFrame(ctk.CTkFrame):
         self.monitors.append(monitor)
         save_log_monitors(self.monitors)
         self._render_table()
+
+    def _manual_notify(self) -> None:
+        summary = []
+        for mon in self.monitors:
+            tail = (self.latest_tail.get(mon.id, "").splitlines() or ["无更新"])[-1]
+            summary.append(f"{Path(mon.path).name}: {tail}")
+        if not summary:
+            messagebox.showinfo("提示", "暂无监控数据")
+            return
+        self._notify_peers("; ".join(summary))
         self._start_monitor(monitor)
 
     def _manual_notify(self) -> None:
